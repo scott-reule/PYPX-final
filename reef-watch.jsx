@@ -1567,8 +1567,32 @@ function Footer({ onNav }) {
 //
 // ✅ SAFE — To change the PIN, update CORRECT_PIN (use "x" for ௹).
 // ✅ SAFE — Star positions are randomised on every page load via generateStarPositions().
+// ✅ SAFE — Lockout durations (seconds). First 10 wrong attempts = grace period, then
+//    each subsequent wrong attempt steps through this list. Last entry repeats forever.
 const KEY_MAP     = { "௹": "x" };
 const CORRECT_PIN = "x0809";
+
+const LOCKOUT_DURATIONS_SEC = [
+  10, 60, 300, 600, 1800, 3600, 10800, 21600, 43200,
+  86400, 172800, 259200, 432000, 604800, 1209600,
+  2592000, 5184000, 10368000, 15552000, 31536000,
+];
+
+function formatCountdown(sec) {
+  if (sec <= 0) return "";
+  const y  = Math.floor(sec / 31536000);
+  const mo = Math.floor((sec % 31536000) / 2592000);
+  const d  = Math.floor((sec % 2592000)  / 86400);
+  const h  = Math.floor((sec % 86400)    / 3600);
+  const m  = Math.floor((sec % 3600)     / 60);
+  const s  = sec % 60;
+  if (y  > 0) return `${y}y ${mo > 0 ? mo + "mo " : ""}`.trim();
+  if (mo > 0) return `${mo}mo ${d > 0 ? d + "d" : ""}`.trim();
+  if (d  > 0) return `${d}d ${h > 0 ? h + "h" : ""}`.trim();
+  if (h  > 0) return `${h}h ${m > 0 ? m + "m" : ""}`.trim();
+  if (m  > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
 
 // 8-pointed pinwheel star clip-path (outer points offset inward asymmetrically)
 const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 82%, 54% 68%, 50% 96%, 40% 65%, 17% 83%, 32% 54%, 4% 50%, 35% 40%, 18% 18%, 46% 32%)";
@@ -1640,18 +1664,49 @@ function generateStarPositions() {
 }
 
 function PinScreen({ onUnlock }) {
-  const [input, setInput]     = useState("");
-  const [shake, setShake]     = useState(false);
-  const [botMsg, setBotMsg]   = useState("");
-  // Track when the PIN screen first appeared (or reset after bot rejection)
-  const startTimeRef = useRef(Date.now());
+  const [input, setInput]   = useState("");
+  const [shake, setShake]   = useState(false);
+  const [botMsg, setBotMsg] = useState("");
 
   // Positions in state so setPositions() triggers a re-render + CSS transition to new spots
   const [positions, setPositions] = useState(() => generateStarPositions());
   const reshuffle = () => setPositions(generateStarPositions());
 
+  // ── Lockout state — persisted in localStorage so reload doesn't reset it ──
+  const [failCount,   setFailCount]   = useState(() => parseInt(localStorage.getItem("pinFails")       || "0", 10));
+  const [lockedUntil, setLockedUntil] = useState(() => parseInt(localStorage.getItem("pinLockedUntil") || "0", 10));
+  const [now, setNow] = useState(Date.now());
+
+  // Tick every second while locked; reshuffle stars the moment lockout expires
+  useEffect(() => {
+    if (lockedUntil <= Date.now()) return;
+    const tick = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= lockedUntil) { clearInterval(tick); reshuffle(); }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [lockedUntil]); // reshuffle is stable (setPositions is a stable setter)
+
+  const isLocked    = now < lockedUntil;
+  const secondsLeft = Math.ceil((lockedUntil - now) / 1000);
+
+  // Track when the PIN screen first appeared (or reset after bot rejection)
+  const startTimeRef = useRef(Date.now());
+
+  const triggerLockout = (fails) => {
+    // First 10 attempts are a grace period; after that every wrong attempt escalates
+    if (fails < 10) return;
+    const level    = Math.min(fails - 10, LOCKOUT_DURATIONS_SEC.length - 1);
+    const duration = LOCKOUT_DURATIONS_SEC[level] * 1000;
+    const until    = Date.now() + duration;
+    setLockedUntil(until);
+    setNow(Date.now());
+    localStorage.setItem("pinLockedUntil", until);
+  };
+
   const press = (d) => {
-    if (input.length >= 5) return;
+    if (isLocked || input.length >= 5) return;
     // Map display characters to their internal PIN values (handles ௹ → "x")
     const val  = KEY_MAP[d] ?? d;
     const next = input + val;
@@ -1671,20 +1726,27 @@ function PinScreen({ onUnlock }) {
             reshuffle();
           }, 1800);
         } else {
+          // Correct PIN, not too fast — clear all lockout state and unlock
+          localStorage.removeItem("pinFails");
+          localStorage.removeItem("pinLockedUntil");
           setTimeout(() => onUnlock(), 300);
         }
       } else {
+        const newFails = failCount + 1;
+        setFailCount(newFails);
+        localStorage.setItem("pinFails", newFails);
         setShake(true);
         setTimeout(() => {
           setInput("");
           setShake(false);
           startTimeRef.current = Date.now();
           reshuffle();
+          triggerLockout(newFails);
         }, 700);
       }
     }
   };
-  const del = () => setInput(i => i.slice(0, -1));
+  const del = () => { if (!isLocked) setInput(i => i.slice(0, -1)); };
 
   return (
     <div style={{ position: "relative", minHeight: "100vh", overflowX: "hidden", background: "#060e1a" }}>
@@ -1835,6 +1897,39 @@ function PinScreen({ onUnlock }) {
           }}>{botMsg}</p>
         )}
       </div>
+
+      {/* ── Lockout overlay — covers everything when too many wrong attempts ── */}
+      {isLocked && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          background: "rgba(4,10,20,0.96)",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: 16,
+        }}>
+          <img src="/coral.png" alt="" style={{ width: 44, opacity: 0.5, marginBottom: 8 }} />
+          <p style={{
+            fontFamily: "Cinzel, Georgia, serif", fontSize: 12,
+            color: "#ff4444", letterSpacing: 4, textTransform: "uppercase",
+            textShadow: "0 0 16px rgba(255,68,68,0.5)",
+          }}>Access Locked</p>
+          <p style={{
+            fontFamily: "Georgia, serif",
+            fontSize: "clamp(48px, 12vw, 72px)",
+            fontWeight: "bold", color: "#d4e5f7",
+            letterSpacing: 2, lineHeight: 1,
+            textShadow: "0 0 30px rgba(90,196,224,0.3)",
+          }}>{formatCountdown(secondsLeft)}</p>
+          <p style={{
+            fontFamily: "Georgia, serif", fontSize: 11,
+            color: "#3a5a7a", letterSpacing: 1, marginTop: 4,
+          }}>Try again when the timer reaches zero</p>
+          <p style={{
+            fontFamily: "Georgia, serif", fontSize: 10,
+            color: "#1e3a4a", letterSpacing: 0.5, marginTop: 8,
+          }}>{failCount} failed attempt{failCount !== 1 ? "s" : ""}</p>
+        </div>
+      )}
     </div>
   );
 }
