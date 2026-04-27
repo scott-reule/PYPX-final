@@ -703,7 +703,7 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 // ✅ SAFE — Change the coral.scottreule.com URL to point to a different simulator.
 // ❌ DANGER — Don't remove the onNav() calls or the active className logic —
 //    that's what makes navigation work.
-function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
+function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -726,8 +726,8 @@ function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
     }}>
       {/* Main bar */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 62, gap: 12 }}>
-        {/* Logo icon */}
-        <div onClick={() => { onNav("Home"); setMobileOpen(false); }} style={{ cursor: "pointer", flexShrink: 0 }}>
+        {/* Logo icon — click to lock the site */}
+        <div onClick={() => { setMobileOpen(false); onLock(); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <div style={{
             width: 34, height: 34,
             background: "linear-gradient(135deg, #0d3a54, #1a6a8a)",
@@ -1823,6 +1823,13 @@ export default function App() {
     setUnlocked(true);
   };
 
+  const lock = () => {
+    sessionStorage.removeItem("wwwUnlocked");
+    // Expire the cookie immediately so middleware blocks /cleanup/* again
+    document.cookie = "wwwUnlocked=; path=/; SameSite=Strict; max-age=0";
+    setUnlocked(false);
+  };
+
   // ❌ DANGER — navigate() is memoised with useCallback so it doesn't re-create
   //    on every render. Don't inline this into JSX props.
   const navigate = useCallback((p) => {
@@ -1858,7 +1865,7 @@ export default function App() {
       <div className={reducedMotion ? "reduced-motion" : ""} style={{ minHeight: "100vh", background: "transparent", position: "relative" }}>
 
         {/* ✅ SAFE — Navbar stays fixed at the top across all pages */}
-        <Navbar current={page} onNav={navigate} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
+        <Navbar current={page} onNav={navigate} onLock={lock} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
 
         {/* ✅ SAFE — key={key} forces a full re-mount on navigation, which
             re-triggers the .page-enter entrance animation on every page change */}
