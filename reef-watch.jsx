@@ -1618,19 +1618,8 @@ function PinScreen({ onUnlock }) {
   const [input, setInput]     = useState("");
   const [shake, setShake]     = useState(false);
   const [botMsg, setBotMsg]   = useState("");
-  const [timeLeft, setTimeLeft] = useState(5);
-
   // Track when the PIN screen first appeared (or reset after bot rejection)
   const startTimeRef = useRef(Date.now());
-
-  // Countdown timer — updates every 100ms, reacts to startTimeRef resets
-  useEffect(() => {
-    const tick = setInterval(() => {
-      const elapsed = (Date.now() - startTimeRef.current) / 1000;
-      setTimeLeft(Math.max(0, 5 - elapsed));
-    }, 100);
-    return () => clearInterval(tick);
-  }, []);
 
   // Stable random positions — generated once per mount, never on re-render
   const starsRef = useRef(null);
@@ -1645,7 +1634,7 @@ function PinScreen({ onUnlock }) {
     if (next.length === 5) {
       if (next === CORRECT_PIN) {
         const elapsed = Date.now() - startTimeRef.current;
-        if (elapsed < 5_000) {
+        if (elapsed < 7_000) {
           // ⚠️ Bot protection — correct PIN entered in under 5 seconds
           setBotMsg("Too fast — please look carefully and try again.");
           setShake(true);
@@ -1781,20 +1770,7 @@ function PinScreen({ onUnlock }) {
         );
       })}
 
-      {/* ── Faint bot-protection countdown — top left ──────────────────────────── */}
-      {timeLeft > 0 && (
-        <div style={{
-          position: "absolute", top: 14, left: 16, zIndex: 20,
-          fontFamily: "Georgia, serif", fontSize: 11,
-          color: `rgba(90,196,224,${Math.min(0.35, timeLeft * 0.07)})`,
-          letterSpacing: 1, pointerEvents: "none",
-          transition: "color 0.3s",
-        }}>
-          {timeLeft.toFixed(1)}s
-        </div>
-      )}
-
-      {/* ── Header panel (sits above stars, pointer-events off so stars behind it stay tappable) ── */}
+{/* ── Header panel (sits above stars, pointer-events off so stars behind it stay tappable) ── */}
       <div style={{
         position: "relative", zIndex: 10,
         display: "flex", flexDirection: "column", alignItems: "center",
