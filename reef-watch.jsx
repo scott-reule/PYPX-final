@@ -1716,7 +1716,8 @@ function PinScreen({ onUnlock }) {
       if (next === CORRECT_PIN) {
         const elapsed = Date.now() - startTimeRef.current;
         if (elapsed < 7_000) {
-          // ⚠️ Bot protection — correct PIN entered in under 7 seconds
+          // ⚠️ Bot protection — correct PIN entered in under 7 seconds.
+          // Does NOT increment failCount — bot rejection is not a failed attempt.
           setBotMsg("Too fast — please look carefully and try again.");
           setShake(true);
           setTimeout(() => {
