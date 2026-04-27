@@ -97,7 +97,7 @@ const css = `
      ❌ DANGER — Don't remove background-size: 400% 400%; the animation
      only works because the gradient is bigger than the viewport. */
   body {
-    background: linear-gradient(-45deg, #304df0, #65aaeb, #00ffc8, #6BEEF6, #65aaeb, #304df0);
+    background: linear-gradient(-45deg, #060e1a, #0a1930, #0d2240, #081525, #0a1930, #060e1a);
     background-size: 400% 400%;
     animation: gradientShift 18s ease infinite;
     color: ${T.pale};
@@ -537,7 +537,7 @@ const SDG_ISSUES = [
 //    num = display badge ("01", "02"…), icon = ICON_MAP key, title + text = content.
 //    To add a solution: add an object and bump up the nums. Layout is 2-column grid.
 const SOLUTIONS = [
-  { num: "01", title: "Beach Clean-Up with SY Junior Seakeepers", icon: "__beach__",   text: "On 21st April, Waves Without Waste joined SY Junior Seakeepers for a hands-on beach clean-up. We collected, sorted, and weighed plastic waste to generate primary data on the types and volumes of plastic reaching the shoreline — directly connecting our research to action." },
+  { num: "01", title: "Beach Clean-Up", icon: "__beach__",   text: "On 21st April, Waves Without Waste conducted a hands-on beach clean-up. We collected, sorted, and weighed plastic waste to generate primary data on the types and volumes of plastic reaching the shoreline — directly connecting our research to action." },
   { num: "02", title: "Interview: Big Blue Ocean Cleanup",         icon: "__mic__",     text: "We conducted a primary research interview with the Big Blue Ocean Cleanup organisation to understand large-scale ocean plastic removal strategies, the challenges of micro-plastic collection, and how community-level action connects to global ocean health outcomes." },
   { num: "03", title: "Reducing Single-Use Plastic",               icon: "__recycle__", text: "Individual and community-level reduction of single-use plastics is one of the most direct levers available. Switching to reusables, refusing unnecessary plastic packaging, and supporting local plastic-free policies can measurably reduce the flow of waste into coastal waterways." },
   { num: "04", title: "Protecting Coral Reef Ecosystems",          icon: "__coral__", text: "With 15–30% of reefs already degraded, protection must combine clean-up action with systemic change — supporting marine protected areas, reducing coastal runoff, and advocating for stronger regional plastic waste policy across Asia." },
@@ -1018,7 +1018,7 @@ function AboutPage() {
               Sustainable Development Goal 14 — <em>Life Below Water</em> — calls for conservation and sustainable use of the world's oceans, seas, and marine resources. Coral reefs, covering less than 1% of the ocean floor, support more than 25% of all marine species and provide food and livelihoods for over a billion people globally. Yet 15–30% of reefs have already been degraded.
             </p>
             <p style={{ fontFamily: T.geo, fontSize: 14, color: T.muted, lineHeight: 1.8, marginTop: 12, maxWidth: 700 }}>
-              Our PYPX project investigates how human use of plastic threatens marine ecosystems — combining primary research including a beach clean-up with SY Junior Seakeepers and an interview with Big Blue Ocean Cleanup, alongside data-driven analysis of plastic pollution trends across Asia.
+              Our PYPX project investigates how human use of plastic threatens marine ecosystems — combining primary research including a beach clean-up and an interview with Big Blue Ocean Cleanup, alongside data-driven analysis of plastic pollution trends across Asia.
             </p>
           </div>
         </div>
@@ -1218,15 +1218,6 @@ function DataPage() {
         </div>
       </div>
 
-      <div style={{
-        background: "rgba(90,196,224,0.04)",
-        border: "1px solid rgba(90,196,224,0.1)",
-        borderRadius: 8, padding: "14px 18px",
-        fontFamily: T.geo, fontSize: 11, color: T.dim,
-        fontStyle: "italic", lineHeight: 1.6,
-      }}>
-        * Data sourced from IPCC AR6, NOAA Coral Reef Watch, IUCN, and Our World in Data. Primary research data collected from the Waves Without Waste beach clean-up (21 April 2025, with SY Junior Seakeepers) and Big Blue Ocean Cleanup interview.
-      </div>
     </div>
   );
 }
@@ -1276,24 +1267,40 @@ function SolutionsPage() {
         ))}
       </div>
 
-      {/* Photo placeholder */}
-      <div style={{
-        marginTop: 36,
-        background: "linear-gradient(135deg, rgba(255,140,80,0.06), rgba(10,25,48,0.8))",
-        border: `1px solid ${T.coralDim}44`,
-        borderRadius: 12, padding: "26px 28px",
-      }}>
+      {/* Beach clean-up photo grid */}
+      <div style={{ marginTop: 36 }}>
+        <p style={{
+          fontFamily: T.geo, fontSize: 11, color: T.teal,
+          letterSpacing: 2, textTransform: "uppercase", textAlign: "center",
+          marginBottom: 16,
+        }}>Beach Clean-Up · 21 April 2025</p>
         <div style={{
-          width: "100%",
-          aspectRatio: "16/9",
-          background: "linear-gradient(135deg, rgba(90,196,224,0.06), rgba(10,25,48,0.8))",
-          border: `2px dashed ${T.steel}`,
-          borderRadius: 10,
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          gap: 8, color: T.dim,
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 10,
         }}>
-          <CameraImg size={42} />
-          <span style={{ fontFamily: T.geo, fontSize: 11, letterSpacing: 1 }}>Beach clean-up photo</span>
+          {[
+            "/cleanup/p1.JPG",
+            "/cleanup/p2.JPG",
+            "/cleanup/p3.JPG",
+            "/cleanup/p4.JPG",
+            "/cleanup/p5.JPG",
+            "/cleanup/p6.JPG",
+          ].map((src, i) => (
+            <div key={i} style={{
+              aspectRatio: "4/3",
+              borderRadius: 8,
+              overflow: "hidden",
+              background: T.navy,
+              border: `1px solid ${T.steel}44`,
+            }}>
+              <img
+                src={src}
+                alt={`Beach clean-up photo ${i + 1}`}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>
