@@ -1578,6 +1578,8 @@ const LOCKOUT_DURATIONS_SEC = [
   2592000, 5184000, 10368000, 15552000, 31536000,
 ];
 
+// ✅ SAFE — Converts a raw second count to a human-readable string ("10s", "5m 30s",
+//    "2h 15m", "3d 4h", "2mo 5d", "1y 3mo"). Used by the lockout overlay.
 function formatCountdown(sec) {
   if (sec <= 0) return "";
   const y  = Math.floor(sec / 31536000);
@@ -1663,10 +1665,17 @@ function generateStarPositions() {
   return placed;
 }
 
+// ── PIN SCREEN COMPONENT ──────────────────────────────────────────────────────
+// ✅ SAFE — Full-screen gate rendered until onUnlock() is called. All lockout
+//    and fail state lives here and is also mirrored in localStorage so a page
+//    reload cannot clear an active lockout.
+// ⚠️  CAREFUL — onUnlock() must set both sessionStorage AND the wwwUnlocked
+//    cookie so the Vercel Edge Middleware recognises the unlock for /cleanup/*.
 function PinScreen({ onUnlock }) {
+  // UI state — input accumulates typed digits; shake triggers the red jitter animation
   const [input, setInput]   = useState("");
   const [shake, setShake]   = useState(false);
-  const [botMsg, setBotMsg] = useState("");
+  const [botMsg, setBotMsg] = useState(""); // bot-protection rejection message
 
   // Positions in state so setPositions() triggers a re-render + CSS transition to new spots
   const [positions, setPositions] = useState(() => generateStarPositions());
@@ -1688,6 +1697,7 @@ function PinScreen({ onUnlock }) {
     return () => clearInterval(tick);
   }, [lockedUntil]); // reshuffle is stable (setPositions is a stable setter)
 
+  // Derived from persisted lockout state — re-computed on every render via the `now` tick
   const isLocked    = now < lockedUntil;
   const secondsLeft = Math.ceil((lockedUntil - now) / 1000);
 
@@ -1706,6 +1716,8 @@ function PinScreen({ onUnlock }) {
     localStorage.setItem("pinLockedUntil", until);
   };
 
+  // ⚠️  CAREFUL — Main key-press handler. Bot check runs BEFORE fail counter so a
+  //    too-fast correct PIN does NOT increment failCount or trigger lockout.
   const press = (d) => {
     if (isLocked || input.length >= 5) return;
     // Map display characters to their internal PIN values (handles ௹ → "x")
@@ -1748,10 +1760,14 @@ function PinScreen({ onUnlock }) {
       }
     }
   };
+  // ✅ SAFE — Removes the last entered digit; no-op while the keypad is locked.
   const del = () => { if (!isLocked) setInput(i => i.slice(0, -1)); };
 
   return (
     <div style={{ position: "relative", minHeight: "100vh", overflowX: "hidden", background: "#060e1a" }}>
+      {/* Keyframes: pinShake — red jitter on wrong PIN | rgbCycle — rainbow hue rotation for
+          star glow and ⌫ | starPulse — gentle breathing on star centres. Class shortcuts
+          (.pin-shake, .rgb-star, .star-center) are applied via className to avoid inline duplication. */}
       <style>{`
         @keyframes pinShake {
           0%,100% { transform: translateX(0); }
@@ -1866,7 +1882,7 @@ function PinScreen({ onUnlock }) {
         );
       })}
 
-{/* ── Header panel (sits above stars, pointer-events off so stars behind it stay tappable) ── */}
+      {/* ── Header panel (sits above stars, pointer-events off so stars behind it stay tappable) ── */}
       <div style={{
         position: "relative", zIndex: 10,
         display: "flex", flexDirection: "column", alignItems: "center",
