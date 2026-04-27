@@ -1543,22 +1543,95 @@ function Footer({ onNav }) {
 // ✅ SAFE — The wrapper <div> background is "transparent" so the animated body
 //    gradient shows through. Don't change it back to a solid colour.
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
-const CORRECT_PIN = "0809";
+const CORRECT_PIN = "௹809";
 
 // 8-pointed pinwheel star clip-path (outer points offset inward asymmetrically)
 const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 82%, 54% 68%, 50% 96%, 40% 65%, 17% 83%, 32% 54%, 4% 50%, 35% 40%, 18% 18%, 46% 32%)";
 
+// Scatter 12 keys across the screen with collision avoidance.
+// Works in % coordinates; uses an assumed 390×844 viewport for px-distance math.
+// Stars are kept in the bottom 54% of the screen so they never cover the header text.
+function generateStarPositions() {
+  // "←" is the delete key — plain arrow so it renders as text inside the star, not as a key-cap glyph
+  const keys = ["1","2","3","4","5","6","7","8","9","0","←","௹"];
+  const VW = 390, VH = 844;           // reference viewport for distance calc
+  const MIN_SIZE = 68, MAX_SIZE = 108; // px
+  const PAD = 18;                      // extra gap between stars
+
+  const placed = [];
+
+  for (const key of keys) {
+    const size = MIN_SIZE + Math.random() * (MAX_SIZE - MIN_SIZE);
+    // Keep star fully inside viewport edges
+    const halfWp = (size / VW) * 50;
+    const halfHp = (size / VH) * 50;
+    const xMin = halfWp + 2, xMax = 100 - halfWp - 2;
+    // yMin starts at 48% so random attempts are always below the header
+    const yMin = Math.max(halfHp + 2, 48), yMax = 100 - halfHp - 2;
+
+    let best = { x: xMin + Math.random() * (xMax - xMin), y: yMin + Math.random() * (yMax - yMin) };
+    let bestScore = -Infinity;
+
+    for (let t = 0; t < 120; t++) {
+      const x = xMin + Math.random() * (xMax - xMin);
+      const y = yMin + Math.random() * (yMax - yMin);
+
+      // Reject the entire top 46% of screen — that's where the header, title, subtitle, and dots live
+      if (y < 46) continue;
+
+      // Score = minimum clearance to all already-placed stars
+      let minClear = Infinity;
+      for (const p of placed) {
+        const dx = (x - p.x) / 100 * VW;
+        const dy = (y - p.y) / 100 * VH;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const needed = (size + p.size) / 2 + PAD;
+        minClear = Math.min(minClear, dist - needed);
+      }
+      if (placed.length === 0) minClear = 999;
+
+      if (minClear > 0) { best = { x, y }; break; }   // no overlap — use it
+      if (minClear > bestScore) { bestScore = minClear; best = { x, y }; }
+    }
+
+    placed.push({ key, x: best.x, y: best.y, size });
+  }
+
+  return placed;
+}
+
 function PinScreen({ onUnlock }) {
-  const [input, setInput] = useState("");
-  const [shake, setShake] = useState(false);
+  const [input, setInput]   = useState("");
+  const [shake, setShake]   = useState(false);
+  const [botMsg, setBotMsg] = useState("");
+
+  // Track when the PIN screen first appeared so we can detect bots
+  const startTimeRef = useRef(Date.now());
+
+  // Stable random positions — generated once per mount, never on re-render
+  const starsRef = useRef(null);
+  if (!starsRef.current) starsRef.current = generateStarPositions();
 
   const press = (d) => {
-    if (input.length >= 4) return;
+    if (input.length >= 5) return;
     const next = input + d;
     setInput(next);
-    if (next.length === 4) {
+    if (next.length === 5) {
       if (next === CORRECT_PIN) {
-        setTimeout(() => onUnlock(), 300);
+        const elapsed = Date.now() - startTimeRef.current;
+        if (elapsed < 10_000) {
+          // ⚠️ Bot protection — correct PIN entered too quickly
+          setBotMsg("Too fast — please look carefully and try again.");
+          setShake(true);
+          setTimeout(() => {
+            setInput("");
+            setShake(false);
+            setBotMsg("");
+            startTimeRef.current = Date.now(); // reset the 10-second window
+          }, 1800);
+        } else {
+          setTimeout(() => onUnlock(), 300);
+        }
       } else {
         setShake(true);
         setTimeout(() => { setInput(""); setShake(false); }, 700);
@@ -1567,14 +1640,8 @@ function PinScreen({ onUnlock }) {
   };
   const del = () => setInput(i => i.slice(0, -1));
 
-  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
-
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center",
-      background: "#060e1a", padding: 24,
-    }}>
+    <div style={{ position: "relative", minHeight: "100vh", overflowX: "hidden", background: "#060e1a" }}>
       <style>{`
         @keyframes pinShake {
           0%,100% { transform: translateX(0); }
@@ -1591,75 +1658,103 @@ function PinScreen({ onUnlock }) {
           0%,100% { transform: scale(0.82); }
           50%      { transform: scale(0.79); }
         }
-        .pin-shake { animation: pinShake 0.55s ease; }
-        .rgb-star   { animation: rgbCycle 3s linear infinite; }
+        .pin-shake   { animation: pinShake 0.55s ease; }
+        .rgb-star    { animation: rgbCycle 3s linear infinite; }
         .star-center { animation: starPulse 2s ease-in-out infinite; transform-origin: center; }
         .star-wrap:active .star-center { transform: scale(0.72) !important; animation: none; }
       `}</style>
 
-      <img src="/coral.png" alt="" style={{ width: 56, marginBottom: 16, opacity: 0.9 }} />
-      <p style={{ fontFamily: "Cinzel, Georgia, serif", fontSize: 17, color: "#7fcdee", letterSpacing: 3, marginBottom: 6 }}>WAVES WITHOUT WASTE</p>
-      <p style={{ fontFamily: "Georgia, serif", fontSize: 12, color: "#3a5a7a", letterSpacing: 1, marginBottom: 40 }}>Enter PIN to continue</p>
+      {/* ── Scattered star buttons ────────────────────────────────────────────── */}
+      {starsRef.current.map(({ key, x, y, size }, idx) => {
+        const isDel = key === "←";
+        const delay = `${-idx * 0.27}s`;
+        const glowSize = size * 3.2;
+        return (
+          <div
+            key={key}
+            className="star-wrap"
+            onClick={() => isDel ? del() : press(key)}
+            style={{
+              position: "absolute",
+              left: `${x}%`, top: `${y}%`,
+              transform: "translate(-50%, -50%)",
+              width: size, height: size,
+              cursor: "pointer", userSelect: "none", zIndex: 5,
+            }}
+          >
+            {/* Light pool spreading out from the star onto the dark screen */}
+            <div className="rgb-star" style={{
+              position: "absolute",
+              width: glowSize, height: glowSize,
+              top: "50%", left: "50%",
+              transform: "translate(-50%, -50%)",
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(255,60,200,0.38) 0%, rgba(80,0,255,0.18) 35%, transparent 70%)",
+              animationDelay: delay,
+              pointerEvents: "none",
+              zIndex: -1,
+            }} />
 
-      {/* PIN dots */}
-      <div className={shake ? "pin-shake" : ""} style={{ display: "flex", gap: 18, marginBottom: 48 }}>
-        {[0,1,2,3].map(i => (
-          <div key={i} style={{
-            width: 14, height: 14, borderRadius: "50%",
-            border: `2px solid ${shake ? "#ff4444" : "#3a8aaa"}`,
-            background: i < input.length ? (shake ? "#ff4444" : "#5ac4e0") : "transparent",
-            transition: "background 0.15s, border-color 0.15s",
-            boxShadow: i < input.length ? `0 0 8px ${shake ? "#ff4444" : "#5ac4e0"}` : "none",
-          }} />
-        ))}
-      </div>
+            {/* RGB conic ring — clipped to pinwheel star shape */}
+            <div className="rgb-star" style={{
+              position: "absolute", inset: 0,
+              clipPath: STAR,
+              background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+              animationDelay: delay,
+            }} />
+            {/* Dark centre — scaled down so only the star edge glows */}
+            <div className="star-center" style={{
+              position: "absolute", inset: 0,
+              clipPath: STAR,
+              background: "radial-gradient(circle at 40% 35%, #0d1f3a, #060e1a)",
+              transformOrigin: "center",
+            }} />
+            {/* Label (digit or ⌫) — scales with star size */}
+            <div style={{
+              position: "absolute", inset: 0, zIndex: 2,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: isDel ? "#7fcdee" : "#d4e5f7",
+              fontSize: size * (isDel ? 0.3 : 0.29),
+              fontFamily: "Georgia, serif", fontWeight: "bold",
+              textShadow: "0 0 10px rgba(90,196,224,0.6)",
+              pointerEvents: "none",
+            }}>{key}</div>
+          </div>
+        );
+      })}
 
-      {/* Star keypad */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 88px)", gap: 18 }}>
-        {keys.map((k, idx) => {
-          if (k === "") return <div key={idx} />;
-          const isDel = k === "⌫";
-          return (
-            <div key={idx} className="star-wrap"
-              onClick={() => isDel ? del() : press(k)}
-              style={{ position: "relative", width: 88, height: 88, cursor: "pointer", userSelect: "none" }}
-            >
-              {isDel ? (
-                /* Delete button — simple, no star */
-                <div style={{
-                  width: "100%", height: "100%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#3a8aaa", fontSize: 24, fontFamily: "Georgia, serif",
-                }}>⌫</div>
-              ) : (
-                <>
-                  {/* RGB glow ring — full star filled with cycling rainbow */}
-                  <div className="rgb-star" style={{
-                    position: "absolute", inset: 0,
-                    clipPath: STAR,
-                    background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-                    animationDelay: `${-idx * 0.27}s`,
-                  }} />
-                  {/* Dark centre star (slightly scaled down → exposes RGB ring as "lights") */}
-                  <div className="star-center" style={{
-                    position: "absolute", inset: 0,
-                    clipPath: STAR,
-                    background: "radial-gradient(circle at 40% 35%, #0d1f3a, #060e1a)",
-                    transformOrigin: "center",
-                  }} />
-                  {/* Number label */}
-                  <div style={{
-                    position: "absolute", inset: 0, zIndex: 2,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#d4e5f7", fontSize: 26, fontFamily: "Georgia, serif", fontWeight: "bold",
-                    textShadow: "0 0 10px rgba(90,196,224,0.6)",
-                    pointerEvents: "none",
-                  }}>{k}</div>
-                </>
-              )}
-            </div>
-          );
-        })}
+      {/* ── Header panel (sits above stars, pointer-events off so stars behind it stay tappable) ── */}
+      <div style={{
+        position: "relative", zIndex: 10,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "10vh", pointerEvents: "none",
+      }}>
+        <img src="/coral.png" alt="" style={{ width: 56, marginBottom: 16, opacity: 0.9 }} />
+        <p style={{ fontFamily: "Cinzel, Georgia, serif", fontSize: 17, color: "#7fcdee", letterSpacing: 3, marginBottom: 6 }}>WAVES WITHOUT WASTE</p>
+        <p style={{ fontFamily: "Georgia, serif", fontSize: 12, color: "#3a5a7a", letterSpacing: 1, marginBottom: 36 }}>Enter PIN to continue</p>
+
+        {/* PIN dots */}
+        <div className={shake ? "pin-shake" : ""} style={{ display: "flex", gap: 18 }}>
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{
+              width: 14, height: 14, borderRadius: "50%",
+              border: `2px solid ${shake ? "#ff4444" : "#3a8aaa"}`,
+              background: i < input.length ? (shake ? "#ff4444" : "#5ac4e0") : "transparent",
+              transition: "background 0.15s, border-color 0.15s",
+              boxShadow: i < input.length ? `0 0 8px ${shake ? "#ff4444" : "#5ac4e0"}` : "none",
+            }} />
+          ))}
+        </div>
+
+        {/* Bot-protection warning */}
+        {botMsg && (
+          <p style={{
+            marginTop: 14,
+            fontFamily: "Georgia, serif", fontSize: 12,
+            color: "#ff6644", letterSpacing: 0.5,
+            textShadow: "0 0 8px rgba(255,100,68,0.5)",
+          }}>{botMsg}</p>
+        )}
       </div>
     </div>
   );
