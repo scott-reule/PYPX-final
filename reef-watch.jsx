@@ -1682,43 +1682,75 @@ function PinScreen({ onUnlock }) {
               cursor: "pointer", userSelect: "none", zIndex: 5,
             }}
           >
-            {/* Light pool spreading out from the star onto the dark screen */}
-            <div className="rgb-star" style={{
-              position: "absolute",
-              width: glowSize, height: glowSize,
-              top: "50%", left: "50%",
-              transform: "translate(-50%, -50%)",
-              borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(255,60,200,0.38) 0%, rgba(80,0,255,0.18) 35%, transparent 70%)",
-              animationDelay: delay,
-              pointerEvents: "none",
-              zIndex: -1,
-            }} />
-
-            {/* RGB conic ring — clipped to pinwheel star shape */}
-            <div className="rgb-star" style={{
-              position: "absolute", inset: 0,
-              clipPath: STAR,
-              background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-              animationDelay: delay,
-            }} />
-            {/* Dark centre — scaled down so only the star edge glows */}
-            <div className="star-center" style={{
-              position: "absolute", inset: 0,
-              clipPath: STAR,
-              background: "radial-gradient(circle at 40% 35%, #0d1f3a, #060e1a)",
-              transformOrigin: "center",
-            }} />
-            {/* Label (digit or ⌫) — scales with star size */}
-            <div style={{
-              position: "absolute", inset: 0, zIndex: 2,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: isDel ? "#7fcdee" : "#d4e5f7",
-              fontSize: size * (isDel ? 0.3 : 0.29),
-              fontFamily: "Georgia, serif", fontWeight: "bold",
-              textShadow: "0 0 10px rgba(90,196,224,0.6)",
-              pointerEvents: "none",
-            }}>{key}</div>
+            {isDel ? (
+              /* Delete key — RGB-lit ⌫ glyph, no star shape */
+              <>
+                {/* Glow pool behind the delete key */}
+                <div className="rgb-star" style={{
+                  position: "absolute",
+                  width: glowSize, height: glowSize,
+                  top: "50%", left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(255,60,200,0.38) 0%, rgba(80,0,255,0.18) 35%, transparent 70%)",
+                  animationDelay: delay,
+                  pointerEvents: "none",
+                  zIndex: -1,
+                }} />
+                {/* ⌫ glyph itself filled with cycling rainbow — the "RGB delete strip" */}
+                <div className="rgb-star" style={{
+                  position: "absolute", inset: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: size * 0.78,
+                  lineHeight: 1,
+                  background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  animationDelay: delay,
+                  pointerEvents: "none",
+                  userSelect: "none",
+                }}>⌫</div>
+              </>
+            ) : (
+              <>
+                {/* Light pool spreading out from the star onto the dark screen */}
+                <div className="rgb-star" style={{
+                  position: "absolute",
+                  width: glowSize, height: glowSize,
+                  top: "50%", left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(255,60,200,0.38) 0%, rgba(80,0,255,0.18) 35%, transparent 70%)",
+                  animationDelay: delay,
+                  pointerEvents: "none",
+                  zIndex: -1,
+                }} />
+                {/* RGB conic ring — clipped to pinwheel star shape */}
+                <div className="rgb-star" style={{
+                  position: "absolute", inset: 0,
+                  clipPath: STAR,
+                  background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+                  animationDelay: delay,
+                }} />
+                {/* Dark centre — scaled down so only the star edge glows */}
+                <div className="star-center" style={{
+                  position: "absolute", inset: 0,
+                  clipPath: STAR,
+                  background: "radial-gradient(circle at 40% 35%, #0d1f3a, #060e1a)",
+                  transformOrigin: "center",
+                }} />
+                {/* Number / special character label — scales with star size */}
+                <div style={{
+                  position: "absolute", inset: 0, zIndex: 2,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#d4e5f7",
+                  fontSize: size * 0.29,
+                  fontFamily: "Georgia, serif", fontWeight: "bold",
+                  textShadow: "0 0 10px rgba(90,196,224,0.6)",
+                  pointerEvents: "none",
+                }}>{key}</div>
+              </>
+            )}
           </div>
         );
       })}
