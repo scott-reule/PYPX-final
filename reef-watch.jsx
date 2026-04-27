@@ -1545,6 +1545,9 @@ function Footer({ onNav }) {
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
 const CORRECT_PIN = "0809";
 
+// 8-pointed pinwheel star clip-path (outer points offset inward asymmetrically)
+const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 82%, 54% 68%, 50% 96%, 40% 65%, 17% 83%, 32% 54%, 4% 50%, 35% 40%, 18% 18%, 46% 32%)";
+
 function PinScreen({ onUnlock }) {
   const [input, setInput] = useState("");
   const [shake, setShake] = useState(false);
@@ -1555,7 +1558,7 @@ function PinScreen({ onUnlock }) {
     setInput(next);
     if (next.length === 4) {
       if (next === CORRECT_PIN) {
-        setTimeout(() => onUnlock(), 200);
+        setTimeout(() => onUnlock(), 300);
       } else {
         setShake(true);
         setTimeout(() => { setInput(""); setShake(false); }, 700);
@@ -1570,57 +1573,93 @@ function PinScreen({ onUnlock }) {
     <div style={{
       minHeight: "100vh", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      background: "linear-gradient(-45deg, #060e1a, #0a1930, #0d2240, #081525)",
-      padding: 24,
+      background: "#060e1a", padding: 24,
     }}>
       <style>{`
         @keyframes pinShake {
           0%,100% { transform: translateX(0); }
-          20%      { transform: translateX(-10px); }
-          40%      { transform: translateX(10px); }
-          60%      { transform: translateX(-8px); }
-          80%      { transform: translateX(8px); }
+          20% { transform: translateX(-12px); }
+          40% { transform: translateX(12px); }
+          60% { transform: translateX(-8px); }
+          80% { transform: translateX(8px); }
         }
-        .pin-shake { animation: pinShake 0.5s ease; }
+        @keyframes rgbCycle {
+          0%   { filter: hue-rotate(0deg)   brightness(1.1); }
+          100% { filter: hue-rotate(360deg) brightness(1.1); }
+        }
+        @keyframes starPulse {
+          0%,100% { transform: scale(0.82); }
+          50%      { transform: scale(0.79); }
+        }
+        .pin-shake { animation: pinShake 0.55s ease; }
+        .rgb-star   { animation: rgbCycle 3s linear infinite; }
+        .star-center { animation: starPulse 2s ease-in-out infinite; transform-origin: center; }
+        .star-wrap:active .star-center { transform: scale(0.72) !important; animation: none; }
       `}</style>
 
-      {/* Logo */}
-      <img src="/coral.png" alt="coral" style={{ width: 56, marginBottom: 16, opacity: 0.9 }} />
-      <p style={{ fontFamily: "Cinzel, Georgia, serif", fontSize: 18, color: "#7fcdee", letterSpacing: 3, marginBottom: 6 }}>WAVES WITHOUT WASTE</p>
+      <img src="/coral.png" alt="" style={{ width: 56, marginBottom: 16, opacity: 0.9 }} />
+      <p style={{ fontFamily: "Cinzel, Georgia, serif", fontSize: 17, color: "#7fcdee", letterSpacing: 3, marginBottom: 6 }}>WAVES WITHOUT WASTE</p>
       <p style={{ fontFamily: "Georgia, serif", fontSize: 12, color: "#3a5a7a", letterSpacing: 1, marginBottom: 40 }}>Enter PIN to continue</p>
 
-      {/* Dots */}
-      <div className={shake ? "pin-shake" : ""} style={{ display: "flex", gap: 16, marginBottom: 44 }}>
+      {/* PIN dots */}
+      <div className={shake ? "pin-shake" : ""} style={{ display: "flex", gap: 18, marginBottom: 48 }}>
         {[0,1,2,3].map(i => (
           <div key={i} style={{
             width: 14, height: 14, borderRadius: "50%",
-            border: "2px solid #3a8aaa",
-            background: i < input.length ? (shake ? "#ff8c50" : "#5ac4e0") : "transparent",
-            transition: "background 0.15s",
+            border: `2px solid ${shake ? "#ff4444" : "#3a8aaa"}`,
+            background: i < input.length ? (shake ? "#ff4444" : "#5ac4e0") : "transparent",
+            transition: "background 0.15s, border-color 0.15s",
+            boxShadow: i < input.length ? `0 0 8px ${shake ? "#ff4444" : "#5ac4e0"}` : "none",
           }} />
         ))}
       </div>
 
-      {/* Keypad */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 72px)", gap: 14 }}>
-        {keys.map((k, i) => (
-          k === "" ? <div key={i} /> :
-          <button key={i}
-            onClick={() => k === "⌫" ? del() : press(k)}
-            style={{
-              width: 72, height: 72, borderRadius: "50%",
-              background: k === "⌫" ? "transparent" : "rgba(90,196,224,0.07)",
-              border: k === "⌫" ? "none" : "1px solid rgba(90,196,224,0.2)",
-              color: k === "⌫" ? "#3a8aaa" : "#d4e5f7",
-              fontSize: k === "⌫" ? 20 : 26,
-              fontFamily: "Georgia, serif",
-              cursor: "pointer",
-              transition: "background 0.15s",
-            }}
-            onMouseEnter={e => { if (k !== "⌫") e.target.style.background = "rgba(90,196,224,0.15)"; }}
-            onMouseLeave={e => { if (k !== "⌫") e.target.style.background = "rgba(90,196,224,0.07)"; }}
-          >{k}</button>
-        ))}
+      {/* Star keypad */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 88px)", gap: 18 }}>
+        {keys.map((k, idx) => {
+          if (k === "") return <div key={idx} />;
+          const isDel = k === "⌫";
+          return (
+            <div key={idx} className="star-wrap"
+              onClick={() => isDel ? del() : press(k)}
+              style={{ position: "relative", width: 88, height: 88, cursor: "pointer", userSelect: "none" }}
+            >
+              {isDel ? (
+                /* Delete button — simple, no star */
+                <div style={{
+                  width: "100%", height: "100%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#3a8aaa", fontSize: 24, fontFamily: "Georgia, serif",
+                }}>⌫</div>
+              ) : (
+                <>
+                  {/* RGB glow ring — full star filled with cycling rainbow */}
+                  <div className="rgb-star" style={{
+                    position: "absolute", inset: 0,
+                    clipPath: STAR,
+                    background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+                    animationDelay: `${-idx * 0.27}s`,
+                  }} />
+                  {/* Dark centre star (slightly scaled down → exposes RGB ring as "lights") */}
+                  <div className="star-center" style={{
+                    position: "absolute", inset: 0,
+                    clipPath: STAR,
+                    background: "radial-gradient(circle at 40% 35%, #0d1f3a, #060e1a)",
+                    transformOrigin: "center",
+                  }} />
+                  {/* Number label */}
+                  <div style={{
+                    position: "absolute", inset: 0, zIndex: 2,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#d4e5f7", fontSize: 26, fontFamily: "Georgia, serif", fontWeight: "bold",
+                    textShadow: "0 0 10px rgba(90,196,224,0.6)",
+                    pointerEvents: "none",
+                  }}>{k}</div>
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
