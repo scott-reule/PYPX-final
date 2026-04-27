@@ -1811,9 +1811,17 @@ export default function App() {
   const [page, setPage] = useState("Home");
   const [key, setKey] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem("wwwUnlocked") === "1");
+  const [unlocked, setUnlocked] = useState(() =>
+    sessionStorage.getItem("wwwUnlocked") === "1" ||
+    document.cookie.split(";").some(c => c.trim() === "wwwUnlocked=1")
+  );
 
-  const unlock = () => { sessionStorage.setItem("wwwUnlocked", "1"); setUnlocked(true); };
+  const unlock = () => {
+    sessionStorage.setItem("wwwUnlocked", "1");
+    // Cookie is read by middleware to block direct /cleanup/* URL access
+    document.cookie = "wwwUnlocked=1; path=/; SameSite=Strict";
+    setUnlocked(true);
+  };
 
   // ❌ DANGER — navigate() is memoised with useCallback so it doesn't re-create
   //    on every render. Don't inline this into JSX props.
