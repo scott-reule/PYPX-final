@@ -1543,20 +1543,31 @@ function Footer({ onNav }) {
 // ✅ SAFE — The wrapper <div> background is "transparent" so the animated body
 //    gradient shows through. Don't change it back to a solid colour.
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
-const CORRECT_PIN = "௹809";
+// ௹ is mapped to "x" internally so string comparison works reliably across encodings
+const KEY_MAP   = { "௹": "x" };
+const CORRECT_PIN = "x0809";
 
 // 8-pointed pinwheel star clip-path (outer points offset inward asymmetrically)
 const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 82%, 54% 68%, 50% 96%, 40% 65%, 17% 83%, 32% 54%, 4% 50%, 35% 40%, 18% 18%, 46% 32%)";
 
 // Scatter 12 keys across the screen with collision avoidance.
 // Works in % coordinates; uses an assumed 390×844 viewport for px-distance math.
-// Stars are kept in the bottom 54% of the screen so they never cover the header text.
+// Unsafe zones match the actual header elements: logo, title text, subtitle, and dots row.
 function generateStarPositions() {
-  // "←" is the delete key — plain arrow so it renders as text inside the star, not as a key-cap glyph
+  // "←" is the delete key — plain arrow renders as text, not as an iOS key-cap glyph
   const keys = ["1","2","3","4","5","6","7","8","9","0","←","௹"];
-  const VW = 390, VH = 844;           // reference viewport for distance calc
+  const VW = 390, VH = 844;            // reference viewport for distance calc
   const MIN_SIZE = 68, MAX_SIZE = 108; // px
   const PAD = 18;                      // extra gap between stars
+
+  // Unsafe rectangles [x1%, y1%, x2%, y2%] for logo, title, subtitle, dots.
+  // Stars avoid landing with their centre inside these zones (expanded by half star size).
+  const UNSAFE = [
+    [32, 7,  68, 21],   // coral logo (centred, small)
+    [5,  21, 95, 31],   // "WAVES WITHOUT WASTE" title
+    [22, 31, 78, 38],   // "Enter PIN to continue" subtitle
+    [20, 38, 80, 48],   // 5 PIN dots row
+  ];
 
   const placed = [];
 
@@ -1566,8 +1577,7 @@ function generateStarPositions() {
     const halfWp = (size / VW) * 50;
     const halfHp = (size / VH) * 50;
     const xMin = halfWp + 2, xMax = 100 - halfWp - 2;
-    // yMin starts at 48% so random attempts are always below the header
-    const yMin = Math.max(halfHp + 2, 48), yMax = 100 - halfHp - 2;
+    const yMin = halfHp + 2,  yMax = 100 - halfHp - 2;
 
     let best = { x: xMin + Math.random() * (xMax - xMin), y: yMin + Math.random() * (yMax - yMin) };
     let bestScore = -Infinity;
@@ -1576,8 +1586,12 @@ function generateStarPositions() {
       const x = xMin + Math.random() * (xMax - xMin);
       const y = yMin + Math.random() * (yMax - yMin);
 
-      // Reject the entire top 46% of screen — that's where the header, title, subtitle, and dots live
-      if (y < 46) continue;
+      // Reject if star centre (plus half-size buffer) lands inside any unsafe zone
+      const blocked = UNSAFE.some(([x1, y1, x2, y2]) =>
+        x > x1 - halfWp && x < x2 + halfWp &&
+        y > y1 - halfHp && y < y2 + halfHp
+      );
+      if (blocked) continue;
 
       // Score = minimum clearance to all already-placed stars
       let minClear = Infinity;
@@ -1601,12 +1615,22 @@ function generateStarPositions() {
 }
 
 function PinScreen({ onUnlock }) {
-  const [input, setInput]   = useState("");
-  const [shake, setShake]   = useState(false);
-  const [botMsg, setBotMsg] = useState("");
+  const [input, setInput]     = useState("");
+  const [shake, setShake]     = useState(false);
+  const [botMsg, setBotMsg]   = useState("");
+  const [timeLeft, setTimeLeft] = useState(5);
 
-  // Track when the PIN screen first appeared so we can detect bots
+  // Track when the PIN screen first appeared (or reset after bot rejection)
   const startTimeRef = useRef(Date.now());
+
+  // Countdown timer — updates every 100ms, reacts to startTimeRef resets
+  useEffect(() => {
+    const tick = setInterval(() => {
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      setTimeLeft(Math.max(0, 5 - elapsed));
+    }, 100);
+    return () => clearInterval(tick);
+  }, []);
 
   // Stable random positions — generated once per mount, never on re-render
   const starsRef = useRef(null);
@@ -1614,20 +1638,22 @@ function PinScreen({ onUnlock }) {
 
   const press = (d) => {
     if (input.length >= 5) return;
-    const next = input + d;
+    // Map display characters to their internal PIN values (handles ௹ → "x")
+    const val  = KEY_MAP[d] ?? d;
+    const next = input + val;
     setInput(next);
     if (next.length === 5) {
       if (next === CORRECT_PIN) {
         const elapsed = Date.now() - startTimeRef.current;
-        if (elapsed < 10_000) {
-          // ⚠️ Bot protection — correct PIN entered too quickly
+        if (elapsed < 5_000) {
+          // ⚠️ Bot protection — correct PIN entered in under 5 seconds
           setBotMsg("Too fast — please look carefully and try again.");
           setShake(true);
           setTimeout(() => {
             setInput("");
             setShake(false);
             setBotMsg("");
-            startTimeRef.current = Date.now(); // reset the 10-second window
+            startTimeRef.current = Date.now(); // restart the 5-second window
           }, 1800);
         } else {
           setTimeout(() => onUnlock(), 300);
@@ -1754,6 +1780,19 @@ function PinScreen({ onUnlock }) {
           </div>
         );
       })}
+
+      {/* ── Faint bot-protection countdown — top left ──────────────────────────── */}
+      {timeLeft > 0 && (
+        <div style={{
+          position: "absolute", top: 14, left: 16, zIndex: 20,
+          fontFamily: "Georgia, serif", fontSize: 11,
+          color: `rgba(90,196,224,${Math.min(0.35, timeLeft * 0.07)})`,
+          letterSpacing: 1, pointerEvents: "none",
+          transition: "color 0.3s",
+        }}>
+          {timeLeft.toFixed(1)}s
+        </div>
+      )}
 
       {/* ── Header panel (sits above stars, pointer-events off so stars behind it stay tappable) ── */}
       <div style={{
