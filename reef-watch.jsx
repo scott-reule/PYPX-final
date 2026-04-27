@@ -1674,7 +1674,11 @@ function PinScreen({ onUnlock }) {
         }
       } else {
         setShake(true);
-        setTimeout(() => { setInput(""); setShake(false); }, 700);
+        setTimeout(() => {
+          setInput("");
+          setShake(false);
+          startTimeRef.current = Date.now(); // wrong PIN resets the 7-second bot window
+        }, 700);
       }
     }
   };
