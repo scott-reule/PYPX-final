@@ -1297,7 +1297,7 @@ function SolutionsPage() {
               <img
                 src={src}
                 alt={`Beach clean-up photo ${i + 1}`}
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
               />
             </div>
           ))}
