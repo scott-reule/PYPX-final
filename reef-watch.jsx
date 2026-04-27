@@ -1227,11 +1227,95 @@ function DataPage() {
 //    - 4 solution cards (pulled from SOLUTIONS array at the top)
 //    - A photo placeholder box (replace the dashed box with a real <img>)
 //
+// ─── PHOTO CAROUSEL (iMessage-style stack) ───────────────────────────────────
+function PhotoCarousel({ photos }) {
+  const [current, setCurrent] = useState(0);
+  const [dragX, setDragX] = useState(0);
+  const [active, setActive] = useState(false);
+  const startXRef = useRef(null);
+  const total = photos.length;
+
+  const goNext = () => { if (current < total - 1) setCurrent(c => c + 1); };
+  const goPrev = () => { if (current > 0) setCurrent(c => c - 1); };
+
+  const onStart = (x) => { startXRef.current = x; setActive(true); };
+  const onMove  = (x) => { if (startXRef.current !== null) setDragX(x - startXRef.current); };
+  const onEnd   = () => {
+    if (dragX < -55) goNext();
+    else if (dragX > 55) goPrev();
+    setDragX(0); setActive(false); startXRef.current = null;
+  };
+
+  return (
+    <div style={{ userSelect: "none", touchAction: "pan-y" }}>
+      <div style={{
+        position: "relative", height: 340,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {/* Stacked peek cards rendered back-to-front */}
+        {[2, 1].map(offset => {
+          const idx = current + offset;
+          if (idx >= total) return null;
+          const rot = offset === 1 ? 5 : -3;
+          return (
+            <div key={idx} style={{
+              position: "absolute",
+              width: "78%", maxWidth: 360,
+              borderRadius: 18, overflow: "hidden",
+              transform: `rotate(${rot}deg) scale(${1 - offset * 0.05}) translateY(${offset * 3}px)`,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.55)",
+              zIndex: 5 - offset, pointerEvents: "none",
+            }}>
+              <img src={photos[idx]} alt="" style={{ width: "100%", display: "block" }} />
+            </div>
+          );
+        })}
+
+        {/* Top (active) card — draggable */}
+        <div
+          style={{
+            position: "absolute",
+            width: "78%", maxWidth: 360,
+            borderRadius: 18, overflow: "hidden",
+            transform: `translateX(${dragX}px) rotate(${dragX * 0.02}deg)`,
+            transition: active ? "none" : "transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)",
+            boxShadow: `0 ${10 + Math.abs(dragX) * 0.08}px ${36 + Math.abs(dragX) * 0.15}px rgba(0,0,0,0.7)`,
+            zIndex: 10, cursor: active ? "grabbing" : "grab",
+          }}
+          onTouchStart={e => onStart(e.touches[0].clientX)}
+          onTouchMove={e => onMove(e.touches[0].clientX)}
+          onTouchEnd={onEnd}
+          onMouseDown={e => { onStart(e.clientX); e.preventDefault(); }}
+          onMouseMove={e => { if (startXRef.current !== null) onMove(e.clientX); }}
+          onMouseUp={onEnd}
+          onMouseLeave={() => { if (startXRef.current !== null) onEnd(); }}
+        >
+          <img
+            src={photos[current]}
+            alt={`Beach clean-up ${current + 1}`}
+            style={{ width: "100%", display: "block", pointerEvents: "none" }}
+          />
+        </div>
+      </div>
+
+      {/* Dot indicators */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 18 }}>
+        {photos.map((_, i) => (
+          <div key={i} onClick={() => setCurrent(i)} style={{
+            height: 6, borderRadius: 3, cursor: "pointer", transition: "all 0.3s",
+            width: i === current ? 22 : 6,
+            background: i === current ? T.teal : T.steel,
+          }} />
+        ))}
+      </div>
+      <p style={{ textAlign: "center", fontFamily: T.geo, fontSize: 10, color: T.dim, marginTop: 8, letterSpacing: 1 }}>
+        {current + 1} / {total} · drag or swipe
+      </p>
+    </div>
+  );
+}
+
 // ✅ SAFE — Edit solution content via the SOLUTIONS array at the top of the file.
-// ✅ SAFE — To add a real photo: replace the placeholder <div> with:
-//    <img src="/your-photo.jpg" alt="Beach clean-up" style={{ width:"100%",
-//    borderRadius:10, aspectRatio:"16/9", objectFit:"cover" }} />
-//    (drop the image in the /public folder first)
 function SolutionsPage() {
   return (
     <div className="page-enter" style={{ minHeight: "100vh", padding: "100px 24px 60px", maxWidth: 1060, margin: "0 auto" }}>
@@ -1267,41 +1351,17 @@ function SolutionsPage() {
         ))}
       </div>
 
-      {/* Beach clean-up photo grid */}
+      {/* Beach clean-up photo carousel */}
       <div style={{ marginTop: 36 }}>
         <p style={{
           fontFamily: T.geo, fontSize: 11, color: T.teal,
           letterSpacing: 2, textTransform: "uppercase", textAlign: "center",
-          marginBottom: 16,
+          marginBottom: 20,
         }}>Beach Clean-Up · 21 April 2025</p>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 10,
-        }}>
-          {[
-            "/cleanup/p1.JPG",
-            "/cleanup/p2.JPG",
-            "/cleanup/p3.JPG",
-            "/cleanup/p4.JPG",
-            "/cleanup/p5.JPG",
-            "/cleanup/p6.JPG",
-          ].map((src, i) => (
-            <div key={i} style={{
-              aspectRatio: "4/3",
-              borderRadius: 8,
-              overflow: "hidden",
-              background: T.navy,
-              border: `1px solid ${T.steel}44`,
-            }}>
-              <img
-                src={src}
-                alt={`Beach clean-up photo ${i + 1}`}
-                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-              />
-            </div>
-          ))}
-        </div>
+        <PhotoCarousel photos={[
+          "/cleanup/p1.JPG", "/cleanup/p2.JPG", "/cleanup/p3.JPG",
+          "/cleanup/p4.JPG", "/cleanup/p5.JPG", "/cleanup/p6.JPG",
+        ]} />
       </div>
     </div>
   );
