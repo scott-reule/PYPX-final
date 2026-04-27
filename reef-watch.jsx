@@ -692,6 +692,8 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 // ⚠️  CAREFUL — Navbar component. Receives:
 //    current       = active page name (highlights the matching nav button)
 //    onNav(page)   = called when a nav link is clicked to change pages
+//    onLock()      = called when the coral logo is clicked — clears cookie + sessionStorage
+//                    and returns the user to the PIN screen
 //    reducedMotion = whether animations are disabled (drives the MOTION button label)
 //    onToggleMotion= called when MOTION button is clicked
 //
@@ -736,7 +738,7 @@ function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 16,
             boxShadow: "0 2px 10px rgba(90,196,224,0.2)",
-          }}><CoralImg size={35} /></div>
+          }}><CoralImg size={34} /></div>
         </div>
 
         {/* Desktop nav — hidden on small via .desktop-nav media query */}
@@ -1162,7 +1164,7 @@ function DataPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20, marginBottom: 24 }}>
 
         {/* Combined overlay: temp rising, coral declining */}
-        <div className="rivet-panel" style={{ padding: "22px 20px", gridColumn: "span 1" }}>
+        <div className="rivet-panel" style={{ padding: "22px 20px" }}>
           <div style={{ fontFamily: T.geo, fontSize: 10, color: T.dim, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>Temperature vs Coverage</div>
           <div style={{ fontFamily: T.geo, fontSize: 16, color: T.pale, fontWeight: 700, marginBottom: 10 }}>As Oceans Warm, Reefs Decline</div>
           <div style={{ display: "flex", gap: 18, marginBottom: 14, flexWrap: "wrap" }}>
@@ -1229,6 +1231,16 @@ function DataPage() {
 //    - A photo placeholder box (replace the dashed box with a real <img>)
 //
 // ─── PHOTO CAROUSEL (iMessage-style stack) ───────────────────────────────────
+// ✅ SAFE — Standalone carousel used inside SolutionsPage.
+//    photos = array of { src, alt } objects.
+//    Swipe or drag left/right to change photo. Tap (drag < 6px) to open lightbox.
+//    Lightbox uses createPortal to escape the .page-enter transform — don't inline it.
+//
+// ⚠️  CAREFUL — position:fixed inside a parent with transform:translateY breaks.
+//    That's why the lightbox renders via createPortal(…, document.body).
+//    Never move the lightbox JSX back inside the carousel's own DOM tree.
+//
+// ✅ SAFE — Edit photo list by passing a different photos[] prop from SolutionsPage.
 function PhotoCarousel({ photos }) {
   const [current, setCurrent] = useState(0);
   const [dragX, setDragX] = useState(0);
@@ -1542,17 +1554,30 @@ function Footer({ onNav }) {
 //
 // ✅ SAFE — The wrapper <div> background is "transparent" so the animated body
 //    gradient shows through. Don't change it back to a solid colour.
+
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
-// ௹ is mapped to "x" internally so string comparison works reliably across encodings
-const KEY_MAP   = { "௹": "x" };
+// ❌ DANGER — PIN logic. CORRECT_PIN and KEY_MAP must stay in sync.
+//    ௹ is mapped to the ASCII char "x" so string comparison works reliably —
+//    the Tamil Rupee Sign can encode differently across environments.
+//    If you change the PIN, update CORRECT_PIN AND the matching KEY_MAP entry.
+//
+// ⚠️  CAREFUL — Bot protection: correct PIN entered in under 7 seconds is rejected.
+//    The threshold is Date.now() - startTimeRef.current < 7_000.
+//    startTimeRef resets after each bot rejection so the window restarts.
+//
+// ✅ SAFE — To change the PIN, update CORRECT_PIN (use "x" for ௹).
+// ✅ SAFE — Star positions are randomised on every page load via generateStarPositions().
+const KEY_MAP     = { "௹": "x" };
 const CORRECT_PIN = "x0809";
 
 // 8-pointed pinwheel star clip-path (outer points offset inward asymmetrically)
 const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 82%, 54% 68%, 50% 96%, 40% 65%, 17% 83%, 32% 54%, 4% 50%, 35% 40%, 18% 18%, 46% 32%)";
 
-// Scatter 12 keys across the screen with collision avoidance.
-// Works in % coordinates; uses an assumed 390×844 viewport for px-distance math.
-// Unsafe zones match the actual header elements: logo, title text, subtitle, and dots row.
+// ✅ SAFE — Generates random (x%, y%) positions for all 12 PIN keys.
+//    Uses rejection sampling with collision avoidance and element-specific unsafe zones.
+//    Positions are stable per mount (stored in useRef) but randomise on page reload.
+// ⚠️  CAREFUL — Coordinates are in percentage units against a 390×844 reference viewport.
+//    Unsafe zones [x1%, y1%, x2%, y2%] match the actual header elements at that size.
 function generateStarPositions() {
   // "←" is the delete key — plain arrow renders as text, not as an iOS key-cap glyph
   const keys = ["1","2","3","4","5","6","7","8","9","0","←","௹"];
@@ -1635,14 +1660,14 @@ function PinScreen({ onUnlock }) {
       if (next === CORRECT_PIN) {
         const elapsed = Date.now() - startTimeRef.current;
         if (elapsed < 7_000) {
-          // ⚠️ Bot protection — correct PIN entered in under 5 seconds
+          // ⚠️ Bot protection — correct PIN entered in under 7 seconds
           setBotMsg("Too fast — please look carefully and try again.");
           setShake(true);
           setTimeout(() => {
             setInput("");
             setShake(false);
             setBotMsg("");
-            startTimeRef.current = Date.now(); // restart the 5-second window
+            startTimeRef.current = Date.now(); // restart the 7-second window
           }, 1800);
         } else {
           setTimeout(() => onUnlock(), 300);
