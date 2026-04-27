@@ -1,11 +1,11 @@
 // ╔══════════════════════════════════════════════════════════════════════════╗
-// ║  reef-watch.jsx  —  Waves Without Waste  (IB PYPX · SDG 14)            ║
-// ║  Single-file React app. All components, styles, and data live here.     ║
+// ║  reef-watch.jsx  —  Waves Without Waste  (IB PYPX · SDG 14)              ║
+// ║  Single-file React app. All components, styles, and data live here.      ║
 // ║                                                                          ║
 // ║  QUICK GUIDE                                                             ║
-// ║  ✅ SAFE    = free to edit, won't break the app                         ║
+// ║  ✅ SAFE    = free to edit, won't break the app                          ║
 // ║  ⚠️  CAREFUL = edit with caution, small mistakes can break layout        ║
-// ║  ❌ DANGER  = don't touch unless you know what you're doing             ║
+// ║  ❌ DANGER  = don't touch unless you know what you're doing              ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
 // ❌ DANGER — React core imports. Never remove or rename these.
@@ -1029,7 +1029,7 @@ function AboutPage() {
       <div style={{ marginBottom: 16, fontFamily: T.geo, fontSize: 10, color: T.dim, letterSpacing: 3, textTransform: "uppercase" }}>
         Key Threats — Field Dossiers
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 18 }}>
         {SDG_ISSUES.map((issue, i) => (
           <div key={i} className="dossier-card" style={{ "--card-accent": issue.accent }}>
             {/* Stamp-like accent top */}
@@ -1141,7 +1141,7 @@ function DataPage() {
       />
 
       {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 44 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 16, marginBottom: 44 }}>
         {stats.map((s, i) => (
           <div key={i} className="stat-card">
             <div style={{ fontSize: 24, marginBottom: 8 }}>{renderIcon(s.icon, 43)}</div>
@@ -1398,7 +1398,7 @@ function SolutionsPage() {
         sub="Evidence-based interventions to protect and restore ocean health"
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20 }}>
         {SOLUTIONS.map((s, i) => (
           <div key={i} className="rivet-panel" style={{ padding: "26px 24px" }}>
             <div style={{
@@ -1542,10 +1542,97 @@ function Footer({ onNav }) {
 //
 // ✅ SAFE — The wrapper <div> background is "transparent" so the animated body
 //    gradient shows through. Don't change it back to a solid colour.
+// ─── PIN SCREEN ───────────────────────────────────────────────────────────────
+const CORRECT_PIN = "0809";
+
+function PinScreen({ onUnlock }) {
+  const [input, setInput] = useState("");
+  const [shake, setShake] = useState(false);
+
+  const press = (d) => {
+    if (input.length >= 4) return;
+    const next = input + d;
+    setInput(next);
+    if (next.length === 4) {
+      if (next === CORRECT_PIN) {
+        setTimeout(() => onUnlock(), 200);
+      } else {
+        setShake(true);
+        setTimeout(() => { setInput(""); setShake(false); }, 700);
+      }
+    }
+  };
+  const del = () => setInput(i => i.slice(0, -1));
+
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+
+  return (
+    <div style={{
+      minHeight: "100vh", display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      background: "linear-gradient(-45deg, #060e1a, #0a1930, #0d2240, #081525)",
+      padding: 24,
+    }}>
+      <style>{`
+        @keyframes pinShake {
+          0%,100% { transform: translateX(0); }
+          20%      { transform: translateX(-10px); }
+          40%      { transform: translateX(10px); }
+          60%      { transform: translateX(-8px); }
+          80%      { transform: translateX(8px); }
+        }
+        .pin-shake { animation: pinShake 0.5s ease; }
+      `}</style>
+
+      {/* Logo */}
+      <img src="/coral.png" alt="coral" style={{ width: 56, marginBottom: 16, opacity: 0.9 }} />
+      <p style={{ fontFamily: "Cinzel, Georgia, serif", fontSize: 18, color: "#7fcdee", letterSpacing: 3, marginBottom: 6 }}>WAVES WITHOUT WASTE</p>
+      <p style={{ fontFamily: "Georgia, serif", fontSize: 12, color: "#3a5a7a", letterSpacing: 1, marginBottom: 40 }}>Enter PIN to continue</p>
+
+      {/* Dots */}
+      <div className={shake ? "pin-shake" : ""} style={{ display: "flex", gap: 16, marginBottom: 44 }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{
+            width: 14, height: 14, borderRadius: "50%",
+            border: "2px solid #3a8aaa",
+            background: i < input.length ? (shake ? "#ff8c50" : "#5ac4e0") : "transparent",
+            transition: "background 0.15s",
+          }} />
+        ))}
+      </div>
+
+      {/* Keypad */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 72px)", gap: 14 }}>
+        {keys.map((k, i) => (
+          k === "" ? <div key={i} /> :
+          <button key={i}
+            onClick={() => k === "⌫" ? del() : press(k)}
+            style={{
+              width: 72, height: 72, borderRadius: "50%",
+              background: k === "⌫" ? "transparent" : "rgba(90,196,224,0.07)",
+              border: k === "⌫" ? "none" : "1px solid rgba(90,196,224,0.2)",
+              color: k === "⌫" ? "#3a8aaa" : "#d4e5f7",
+              fontSize: k === "⌫" ? 20 : 26,
+              fontFamily: "Georgia, serif",
+              cursor: "pointer",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => { if (k !== "⌫") e.target.style.background = "rgba(90,196,224,0.15)"; }}
+            onMouseLeave={e => { if (k !== "⌫") e.target.style.background = "rgba(90,196,224,0.07)"; }}
+          >{k}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState("Home");
   const [key, setKey] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem("wwwUnlocked") === "1");
+
+  const unlock = () => { sessionStorage.setItem("wwwUnlocked", "1"); setUnlocked(true); };
 
   // ❌ DANGER — navigate() is memoised with useCallback so it doesn't re-create
   //    on every render. Don't inline this into JSX props.
@@ -1565,6 +1652,8 @@ export default function App() {
       default:                return <HomePage onNav={navigate} />;
     }
   };
+
+  if (!unlocked) return <PinScreen onUnlock={unlock} />;
 
   return (
     <>
