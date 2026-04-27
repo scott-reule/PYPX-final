@@ -12,6 +12,7 @@
 //    useState/useEffect/useRef/useCallback are hooks used throughout the file.
 //    React itself is needed because Vite compiles JSX to React.createElement().
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 // ❌ DANGER — Charting library (recharts). Only remove an import if you also
 //    remove every usage of it in the charts below. Adding new chart types
@@ -1232,6 +1233,7 @@ function PhotoCarousel({ photos }) {
   const [current, setCurrent] = useState(0);
   const [dragX, setDragX] = useState(0);
   const [active, setActive] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // null = closed, number = open at index
   const startXRef = useRef(null);
   const total = photos.length;
 
@@ -1241,77 +1243,148 @@ function PhotoCarousel({ photos }) {
   const onStart = (x) => { startXRef.current = x; setActive(true); };
   const onMove  = (x) => { if (startXRef.current !== null) setDragX(x - startXRef.current); };
   const onEnd   = () => {
-    if (dragX < -55) goNext();
+    const dist = Math.abs(dragX);
+    if (dist < 6) setLightbox(current); // tap = open lightbox
+    else if (dragX < -55) goNext();
     else if (dragX > 55) goPrev();
     setDragX(0); setActive(false); startXRef.current = null;
   };
 
-  return (
-    <div style={{ userSelect: "none", touchAction: "pan-y" }}>
-      <div style={{
-        position: "relative", height: 340,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        {/* Stacked peek cards rendered back-to-front */}
-        {[2, 1].map(offset => {
-          const idx = current + offset;
-          if (idx >= total) return null;
-          const rot = offset === 1 ? 5 : -3;
-          return (
-            <div key={idx} style={{
-              position: "absolute",
-              width: "78%", maxWidth: 360,
-              borderRadius: 18, overflow: "hidden",
-              transform: `rotate(${rot}deg) scale(${1 - offset * 0.05}) translateY(${offset * 3}px)`,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.55)",
-              zIndex: 5 - offset, pointerEvents: "none",
-            }}>
-              <img src={photos[idx]} alt="" style={{ width: "100%", display: "block" }} />
-            </div>
-          );
-        })}
+  // Lightbox keyboard nav
+  useEffect(() => {
+    if (lightbox === null) return;
+    const handler = (e) => {
+      if (e.key === "ArrowRight") setLightbox(i => Math.min(i + 1, total - 1));
+      if (e.key === "ArrowLeft")  setLightbox(i => Math.max(i - 1, 0));
+      if (e.key === "Escape")     setLightbox(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightbox, total]);
 
-        {/* Top (active) card — draggable */}
-        <div
-          style={{
-            position: "absolute",
-            width: "78%", maxWidth: 360,
-            borderRadius: 18, overflow: "hidden",
-            transform: `translateX(${dragX}px) rotate(${dragX * 0.02}deg)`,
-            transition: active ? "none" : "transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)",
-            boxShadow: `0 ${10 + Math.abs(dragX) * 0.08}px ${36 + Math.abs(dragX) * 0.15}px rgba(0,0,0,0.7)`,
-            zIndex: 10, cursor: active ? "grabbing" : "grab",
-          }}
-          onTouchStart={e => onStart(e.touches[0].clientX)}
-          onTouchMove={e => onMove(e.touches[0].clientX)}
-          onTouchEnd={onEnd}
-          onMouseDown={e => { onStart(e.clientX); e.preventDefault(); }}
-          onMouseMove={e => { if (startXRef.current !== null) onMove(e.clientX); }}
-          onMouseUp={onEnd}
-          onMouseLeave={() => { if (startXRef.current !== null) onEnd(); }}
-        >
-          <img
-            src={photos[current]}
-            alt={`Beach clean-up ${current + 1}`}
-            style={{ width: "100%", display: "block", pointerEvents: "none" }}
-          />
+  return (
+    <>
+      {/* Stack */}
+      <div style={{ userSelect: "none", touchAction: "pan-y" }}>
+        <div style={{
+          position: "relative", height: 340,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {[2, 1].map(offset => {
+            const idx = current + offset;
+            if (idx >= total) return null;
+            const rot = offset === 1 ? 5 : -3;
+            return (
+              <div key={idx} style={{
+                position: "absolute", width: "78%", maxWidth: 360,
+                borderRadius: 18, overflow: "hidden",
+                transform: `rotate(${rot}deg) scale(${1 - offset * 0.05}) translateY(${offset * 3}px)`,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.55)",
+                zIndex: 5 - offset, pointerEvents: "none",
+              }}>
+                <img src={photos[idx]} alt="" style={{ width: "100%", display: "block" }} />
+              </div>
+            );
+          })}
+
+          <div
+            style={{
+              position: "absolute", width: "78%", maxWidth: 360,
+              borderRadius: 18, overflow: "hidden",
+              transform: `translateX(${dragX}px) rotate(${dragX * 0.02}deg)`,
+              transition: active ? "none" : "transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)",
+              boxShadow: `0 ${10 + Math.abs(dragX) * 0.08}px ${36 + Math.abs(dragX) * 0.15}px rgba(0,0,0,0.7)`,
+              zIndex: 10, cursor: "pointer",
+            }}
+            onTouchStart={e => onStart(e.touches[0].clientX)}
+            onTouchMove={e => onMove(e.touches[0].clientX)}
+            onTouchEnd={onEnd}
+            onMouseDown={e => { onStart(e.clientX); e.preventDefault(); }}
+            onMouseMove={e => { if (startXRef.current !== null) onMove(e.clientX); }}
+            onMouseUp={onEnd}
+            onMouseLeave={() => { if (startXRef.current !== null) onEnd(); }}
+          >
+            <img src={photos[current]} alt={`Beach clean-up ${current + 1}`}
+              style={{ width: "100%", display: "block", pointerEvents: "none" }} />
+          </div>
+        </div>
+
+        {/* Dots */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 18 }}>
+          {photos.map((_, i) => (
+            <div key={i} onClick={() => setCurrent(i)} style={{
+              height: 6, borderRadius: 3, cursor: "pointer", transition: "all 0.3s",
+              width: i === current ? 22 : 6,
+              background: i === current ? T.teal : T.steel,
+            }} />
+          ))}
         </div>
       </div>
 
-      {/* Dot indicators */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 18 }}>
-        {photos.map((_, i) => (
-          <div key={i} onClick={() => setCurrent(i)} style={{
-            height: 6, borderRadius: 3, cursor: "pointer", transition: "all 0.3s",
-            width: i === current ? 22 : 6,
-            background: i === current ? T.teal : T.steel,
-          }} />
-        ))}
-      </div>
-      <p style={{ textAlign: "center", fontFamily: T.geo, fontSize: 10, color: T.dim, marginTop: 8, letterSpacing: 1 }}>
-        {current + 1} / {total} · drag or swipe
-      </p>
-    </div>
+      {/* Lightbox — portalled to document.body to escape page-enter transform */}
+      {lightbox !== null && createPortal(
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          {/* Prev arrow */}
+          {lightbox > 0 && (
+            <button onClick={e => { e.stopPropagation(); setLightbox(i => i - 1); }} style={{
+              position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
+              background: "rgba(255,255,255,0.12)", border: "none", borderRadius: "50%",
+              width: 44, height: 44, color: "#fff", fontSize: 20, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>‹</button>
+          )}
+
+          {/* Photo */}
+          <img
+            src={photos[lightbox]}
+            alt=""
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: "90vw", maxHeight: "88vh",
+              borderRadius: 16, boxShadow: "0 24px 80px rgba(0,0,0,0.8)",
+              display: "block",
+            }}
+          />
+
+          {/* Next arrow */}
+          {lightbox < total - 1 && (
+            <button onClick={e => { e.stopPropagation(); setLightbox(i => i + 1); }} style={{
+              position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
+              background: "rgba(255,255,255,0.12)", border: "none", borderRadius: "50%",
+              width: 44, height: 44, color: "#fff", fontSize: 20, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>›</button>
+          )}
+
+          {/* Close */}
+          <button onClick={() => setLightbox(null)} style={{
+            position: "absolute", top: 16, right: 16,
+            background: "rgba(255,255,255,0.12)", border: "none", borderRadius: "50%",
+            width: 36, height: 36, color: "#fff", fontSize: 18, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>×</button>
+
+          {/* Dot counter */}
+          <div style={{ position: "absolute", bottom: 20, display: "flex", gap: 6 }}>
+            {photos.map((_, i) => (
+              <div key={i} onClick={e => { e.stopPropagation(); setLightbox(i); }} style={{
+                height: 6, borderRadius: 3, cursor: "pointer", transition: "all 0.3s",
+                width: i === lightbox ? 22 : 6,
+                background: i === lightbox ? "#fff" : "rgba(255,255,255,0.3)",
+              }} />
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
