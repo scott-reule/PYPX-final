@@ -1695,9 +1695,10 @@ function PinScreen({ onUnlock }) {
   const startTimeRef = useRef(Date.now());
 
   const triggerLockout = (fails) => {
-    // 1-9 = free. First lockout fires on attempt 10, then every 20 after (10, 30, 50, 70 …)
-    if (fails < 10 || (fails - 10) % 20 !== 0) return;
-    const level    = Math.min((fails - 10) / 20, LOCKOUT_DURATIONS_SEC.length - 1);
+    // 1-9 = free. Every wrong attempt from 10 onward triggers a lockout.
+    // The range it falls in determines the duration: 10-29 → level 0, 30-49 → level 1, etc.
+    if (fails < 10) return;
+    const level    = Math.min(Math.floor((fails - 10) / 20), LOCKOUT_DURATIONS_SEC.length - 1);
     const duration = LOCKOUT_DURATIONS_SEC[level] * 1000;
     const until    = Date.now() + duration;
     setLockedUntil(until);
