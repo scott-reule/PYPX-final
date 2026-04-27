@@ -1,7 +1,33 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  reef-watch.jsx  —  Waves Without Waste  (IB PYPX · SDG 14)            ║
+// ║  Single-file React app. All components, styles, and data live here.     ║
+// ║                                                                          ║
+// ║  QUICK GUIDE                                                             ║
+// ║  ✅ SAFE    = free to edit, won't break the app                         ║
+// ║  ⚠️  CAREFUL = edit with caution, small mistakes can break layout        ║
+// ║  ❌ DANGER  = don't touch unless you know what you're doing             ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+// ❌ DANGER — React core imports. Never remove or rename these.
+//    useState/useEffect/useRef/useCallback are hooks used throughout the file.
+//    React itself is needed because Vite compiles JSX to React.createElement().
+import React, { useState, useEffect, useRef, useCallback } from "react";
+
+// ❌ DANGER — Charting library (recharts). Only remove an import if you also
+//    remove every usage of it in the charts below. Adding new chart types
+//    (e.g. PieChart) requires importing them here first.
 import { LineChart, Line, AreaChart, Area, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+// ✅ SAFE — This is your colour palette. Every colour used in the site
+//    comes from here. Change a value here and it updates everywhere.
+//    T.abyss  = darkest background  |  T.teal = primary accent (blue-green)
+//    T.coral  = orange highlight    |  T.pale = main body text colour
+//    T.geo    = serif font stack    |  T.num  = numbers / data font
+//
+// ⚠️  CAREFUL — The key names (abyss, teal, coral…) are referenced all over
+//    the file. Renaming a key (e.g. "teal" → "blue") will break every place
+//    that uses T.teal. Only change the hex values, not the key names.
 const T = {
   abyss:    "#060e1a",
   deep:     "#0a1930",
@@ -22,11 +48,30 @@ const T = {
   num:      "'Times New Roman', Times, serif",
 };
 
+// ─── GLOBAL STYLES (CSS-in-JS) ───────────────────────────────────────────────
+// ✅ SAFE — The `css` string is injected as a <style> tag into the page.
+//    Think of it as a regular CSS file written inside JavaScript.
+//    Template literals like ${T.teal} pull live values from the T object above.
+//
+// ⚠️  CAREFUL — The @keyframes blocks (bubbleRise, gradientShift, etc.) drive
+//    all the animations. Changing % values changes animation timing. Deleting
+//    a keyframe name while the animation is still referenced will silently
+//    break that animation.
+//
+// ❌ DANGER — The class names (.glass-panel, .rivet-panel, .btn-primary…) are
+//    used directly in the JSX below as className="glass-panel" etc.
+//    Renaming a class here WITHOUT updating every className= in the JSX below
+//    will make those elements lose their styling.
 const css = `
+  /* Loads the Cinzel display font from Google Fonts (used for headings).
+     ⚠️  Requires internet. Works offline only if font is already cached. */
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
 
+  /* ✅ SAFE — CSS reset: removes browser default margin/padding on everything */
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* ✅ SAFE — CSS variables mirroring the T token object. Useful if you ever
+     want to reference a colour from a plain CSS context (e.g. ::before). */
   :root {
     --abyss: ${T.abyss};
     --teal: ${T.teal};
@@ -34,12 +79,44 @@ const css = `
     --pale: ${T.pale};
   }
 
-  body { background: ${T.abyss}; color: ${T.pale}; font-family: ${T.geo}; overflow-x: hidden; }
+  /* ✅ SAFE — Background gradient animation keyframes.
+     Moves the gradient's "camera" back and forth across a 400%×400% canvas,
+     creating a slow shifting colour wash effect.
+     Change "18s" below to make it faster (lower) or slower (higher). */
+  @keyframes gradientShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
 
+  /* ✅ SAFE — Animated gradient background on the page body.
+     The 4 colours (#304df0 blue, #65aaeb sky, #00ffc8 cyan, #6BEEF6 aqua)
+     cycle smoothly via gradientShift above.
+     To change colours: edit the hex values in the linear-gradient line.
+     To change speed: edit "18s" in the animation line.
+     ❌ DANGER — Don't remove background-size: 400% 400%; the animation
+     only works because the gradient is bigger than the viewport. */
+  body {
+    background: linear-gradient(-45deg, #304df0, #65aaeb, #00ffc8, #6BEEF6, #65aaeb, #304df0);
+    background-size: 400% 400%;
+    animation: gradientShift 18s ease infinite;
+    color: ${T.pale};
+    font-family: ${T.geo};
+    overflow-x: hidden;
+  }
+
+  /* ✅ SAFE — Custom scrollbar styling (Chrome/Safari only, ignored by Firefox).
+     width: 6px makes it slim. Change ${T.steel} to any colour for the thumb. */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: ${T.abyss}; }
   ::-webkit-scrollbar-thumb { background: ${T.steel}; border-radius: 3px; }
 
+  /* ✅ SAFE — Bubble floating-up animation keyframes.
+     Bubbles drift sideways slightly (translateX) as they rise (translateY).
+     Adjust the translateX pixel values for more/less horizontal drift.
+     ⚠️  CAREFUL — translateY values are in viewport-height units (vh).
+     -100vh means "rise the full height of the screen". Don't change this
+     or bubbles may not fully disappear off-screen. */
   @keyframes bubbleRise {
     0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0.6; }
     25%  { transform: translateY(-25vh) translateX(8px) scale(1.05); opacity: 0.5; }
@@ -48,6 +125,9 @@ const css = `
     100% { transform: translateY(-100vh) translateX(0) scale(0.8); opacity: 0; }
   }
 
+  /* ✅ SAFE — Underwater light-shimmer animation (used by CausticLight component).
+     Two variants (causticShimmer / caustic2) with slightly different timing
+     so the ellipses don't all pulse in sync. Safe to adjust opacity values. */
   @keyframes causticShimmer {
     0%,100% { opacity: 0.04; transform: scale(1) rotate(0deg); }
     33%      { opacity: 0.07; transform: scale(1.05) rotate(1deg); }
@@ -59,6 +139,8 @@ const css = `
     50%      { opacity: 0.06; transform: scale(0.98) rotate(-1deg); }
   }
 
+  /* ✅ SAFE — Page-enter animation: elements slide up from 32px below while fading in.
+     Used by the .page-enter class applied to every page component. */
   @keyframes fadeSlideUp {
     from { opacity: 0; transform: translateY(32px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -94,20 +176,32 @@ const css = `
     to   { opacity: 1; transform: translateY(0); }
   }
 
+  /* ✅ SAFE — Applied to every page's root div. Triggers the slide-up entrance.
+     "0.55s" = duration. The cubic-bezier is a spring-like easing curve.
+     Change 0.55s to make transitions faster/slower. */
   .page-enter {
     animation: fadeSlideUp 0.55s cubic-bezier(0.22,1,0.36,1) both;
   }
 
+  /* ✅ SAFE — Floating bubble style.
+     background: radial-gradient gives the glassy sphere look.
+     border: semi-transparent rim. pointer-events: none means clicks pass through.
+     z-index: 0 keeps bubbles behind all content (z-index > 0 in panels).
+     To make bubbles bigger: edit the size values in the Bubbles component below.
+     To change bubble colour: edit the rgba values here. */
   .bubble {
     position: fixed;
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(90,196,224,0.35), rgba(90,196,224,0.05));
-    border: 1px solid rgba(90,196,224,0.2);
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.45), rgba(255,255,255,0.05));
+    border: 1px solid rgba(255,255,255,0.35);
     pointer-events: none;
     animation: bubbleRise linear infinite;
     z-index: 0;
   }
 
+  /* ✅ SAFE — Semi-transparent frosted-glass panel used for callout boxes.
+     backdrop-filter: blur(12px) is the "blur-what's-behind-it" effect.
+     Safe to change border colour, radius, or shadow strength. */
   .glass-panel {
     background: linear-gradient(135deg, rgba(26,53,80,0.7) 0%, rgba(10,25,48,0.85) 100%);
     border: 1px solid rgba(90,196,224,0.18);
@@ -116,6 +210,10 @@ const css = `
     box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(90,196,224,0.12);
   }
 
+  /* ✅ SAFE — Dark card panel with decorative corner "rivets" (the ::before/::after
+     pseudo-elements that draw small circles in each top corner).
+     Used for chart containers and solution cards.
+     Safe to change background gradient, border colour, or border-radius. */
   .rivet-panel {
     background: linear-gradient(180deg, #0f2035 0%, #0a1828 100%);
     border: 2px solid ${T.steel};
@@ -135,6 +233,9 @@ const css = `
   .rivet-panel::before { left: 10px; }
   .rivet-panel::after  { right: 10px; }
 
+  /* ✅ SAFE — Teal "Explore" style button.
+     Safe to change colours, font-size, padding, border-radius.
+     ⚠️  CAREFUL — Don't remove "cursor: pointer" or the button won't look clickable. */
   .btn-primary {
     background: linear-gradient(180deg, #1a6a8a 0%, #0d3a54 100%);
     border: 1.5px solid ${T.teal};
@@ -155,6 +256,8 @@ const css = `
     transform: translateY(-1px);
   }
 
+  /* ✅ SAFE — Coral/orange "Launch Simulator" style button.
+     Same structure as btn-primary but uses the coral/orange accent colour. */
   .btn-coral {
     background: linear-gradient(180deg, #cc5020 0%, #882010 100%);
     border: 1.5px solid ${T.coral};
@@ -173,6 +276,8 @@ const css = `
     box-shadow: 0 4px 22px rgba(255,140,80,0.45);
   }
 
+  /* ✅ SAFE — Data stat cards (the big number tiles on the Data & Evidence page).
+     The :hover rule lifts the card 3px and deepens the shadow. */
   .stat-card {
     background: linear-gradient(160deg, rgba(26,53,80,0.8), rgba(10,25,48,0.9));
     border: 1px solid rgba(90,196,224,0.2);
@@ -187,6 +292,10 @@ const css = `
     box-shadow: 0 8px 28px rgba(0,0,0,0.45), 0 0 16px rgba(90,196,224,0.12);
   }
 
+  /* ✅ SAFE — Navigation link button style (Home / About SDG14 / etc.).
+     .active adds the glowing underline to the current page's button.
+     ❌ DANGER — Don't remove "position: relative" from .nav-link or the
+     ::after underline indicator will be positioned wrong. */
   .nav-link {
     font-family: ${T.geo};
     font-size: 13px;
@@ -211,6 +320,8 @@ const css = `
     box-shadow: 0 0 6px ${T.teal};
   }
 
+  /* ✅ SAFE — Badge / highlight card with a glowing top-border stripe.
+     The ::before creates that thin top gradient line. */
   .badge-card {
     background: linear-gradient(160deg, #0f2840 0%, #08172a 100%);
     border: 1.5px solid ${T.steel};
@@ -254,6 +365,10 @@ const css = `
     border: 1px solid rgba(90,196,224,0.12);
   }
 
+  /* ✅ SAFE — "Field Dossier" threat cards on the About page.
+     Each card uses a CSS custom property --card-accent for its bottom-glow
+     colour (set per card in JSX via style={{ "--card-accent": issue.accent }}).
+     The ::after creates the coloured bottom-line that fades in on hover. */
   .dossier-card {
     background: linear-gradient(160deg, rgba(20,45,70,0.75), rgba(8,20,38,0.9));
     border: 1px solid rgba(90,196,224,0.15);
@@ -283,6 +398,9 @@ const css = `
     overflow: hidden;
   }
 
+  /* ✅ SAFE — Lines of Inquiry cards on the Home page.
+     The ::before draws a teal→coral vertical bar on the left edge of each card.
+     Change the gradient colours to adjust that accent bar. */
   .loi-card {
     background: linear-gradient(160deg, rgba(18,40,62,0.8), rgba(8,18,34,0.9));
     border: 1px solid rgba(90,196,224,0.18);
@@ -306,6 +424,12 @@ const css = `
     background: linear-gradient(180deg, ${T.teal}, ${T.coral});
   }
 
+  /* ⚠️  CAREFUL — Mobile hamburger menu visibility.
+     The hamburger (☰) button is hidden on wide screens and shown on small
+     screens (≤640px). The desktop nav is toggled the opposite way.
+     ❌ DANGER — Don't change the #hamburger id or .desktop-nav class name
+     here without also changing the corresponding id/className in the Navbar
+     component JSX below. */
   #hamburger { display: none; }
 
   @media (max-width: 640px) {
@@ -319,6 +443,9 @@ const css = `
     gap: 16px;
   }
 
+  /* ✅ SAFE — Accessibility: respects the OS-level "Reduce Motion" setting.
+     Cuts all animations to near-zero so users with motion sensitivity
+     don't experience flashing/moving elements. Don't remove this. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -327,6 +454,9 @@ const css = `
     }
   }
 
+  /* ✅ SAFE — Same as above but triggered by the ◎ MOTION button in the navbar.
+     When the user clicks it, the App adds className="reduced-motion" to the
+     root wrapper div, and this rule kills all child animations. */
   .reduced-motion *, .reduced-motion *::before, .reduced-motion *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -335,6 +465,20 @@ const css = `
 `;
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
+// ✅ SAFE — All data arrays below. Edit these to update the charts and stat cards.
+//
+// Each array is an object list with short property names used by the charts:
+//   y  = year label (shown on X-axis)
+//   t  = temperature anomaly in °C (used in temp and combined charts)
+//   c  = coral coverage % of 1950 baseline (used in coral and combined charts)
+//   p  = plastic entering oceans in million tonnes/year (used in bar chart)
+//
+// ✅ SAFE — Add a new data point by adding another {y:"YEAR", value:0} object.
+// ⚠️  CAREFUL — tempData, coralData, and combinedData must all use the same
+//    year values if you want the combined chart (temp+coral overlay) to line up.
+//    combinedData is manually merged — if you add a year to tempData or coralData,
+//    also add it to combinedData with both t and c values.
+//
 // SST anomaly vs 1961–1990 baseline — HadSST4 (observed) + IPCC AR6 SSP2-4.5 (projected *)
 const tempData = [
   {y:"1980",t:0.14},{y:"1985",t:0.05},{y:"1990",t:0.30},{y:"1995",t:0.31},
@@ -368,6 +512,8 @@ const combinedData = [
   {y:"2040", t:1.20, c:56},
 ];
 
+// ✅ SAFE — Team members list. Each entry: name (shown in footer), emoji, accent colour.
+//    Add or remove team members here. colour must be a hex string or T.xxx token.
 const TEAM = [
   { name: "Scott",   emoji: "🦈", color: T.teal },
   { name: "Cara",    emoji: "🐠", color: T.coral },
@@ -376,6 +522,10 @@ const TEAM = [
   { name: "Qihao",   emoji: "🐬", color: T.amber },
 ];
 
+// ✅ SAFE — The 4 "Field Dossier" threat cards shown on the About SDG14 page.
+//    Each entry: icon (must match a key in ICON_MAP below), title, accent colour, text.
+//    Edit text/title freely. Change accent to any T.xxx colour or hex value.
+//    To add a 5th card: add an object to this array. Layout is auto-grid (2-column).
 const SDG_ISSUES = [
   { icon: "__bag__",    title: "Plastic Pollution",    accent: T.coral,   text: "Over 11 million metric tonnes of plastic enter the ocean every year. In Asia — responsible for the majority of ocean plastic — rapid urbanisation and insufficient waste infrastructure have made coastal plastic pollution a defining crisis of our generation." },
   { icon: "__coral__",  title: "Coral Reef Decline",   accent: T.amber,   text: "Between 15–30% of the world's coral reefs have already been degraded or destroyed. Plastic debris smothers coral, blocks sunlight, and introduces pathogens — directly accelerating bleaching and colony death." },
@@ -383,6 +533,9 @@ const SDG_ISSUES = [
   { icon: "__globe__",  title: "Asia's Plastic Crisis", accent: "#a0c4ff", text: "Asia accounts for an estimated 80% of ocean plastic entering the sea. Factors include high coastal population density, fast-growing consumer economies, and waste management gaps — making this region the critical focus for any meaningful intervention." },
 ];
 
+// ✅ SAFE — The 4 solution cards on the Solutions page.
+//    num = display badge ("01", "02"…), icon = ICON_MAP key, title + text = content.
+//    To add a solution: add an object and bump up the nums. Layout is 2-column grid.
 const SOLUTIONS = [
   { num: "01", title: "Beach Clean-Up with SY Junior Seakeepers", icon: "__beach__",   text: "On 21st April, Waves Without Waste joined SY Junior Seakeepers for a hands-on beach clean-up. We collected, sorted, and weighed plastic waste to generate primary data on the types and volumes of plastic reaching the shoreline — directly connecting our research to action." },
   { num: "02", title: "Interview: Big Blue Ocean Cleanup",         icon: "__mic__",     text: "We conducted a primary research interview with the Big Blue Ocean Cleanup organisation to understand large-scale ocean plastic removal strategies, the challenges of micro-plastic collection, and how community-level action connects to global ocean health outcomes." },
@@ -391,6 +544,17 @@ const SOLUTIONS = [
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────
+// ✅ SAFE — PngIcon is a tiny wrapper that renders a PNG image at a given size.
+//    The named exports below (CoralImg, FishImg…) are shortcuts so you can write
+//    <CoralImg size={40} /> anywhere instead of <PngIcon src="/coral.png" size={40} />.
+//
+//    Image files live in the /public folder (e.g. /public/coral.png).
+//    To add a new icon: drop the PNG into /public, create a new line like:
+//      const MyImg = ({ size = 35 }) => <PngIcon src="/my-icon.png" alt="my icon" size={size} />;
+//    Then add it to ICON_MAP below with a "__mykey__" string.
+//
+// ⚠️  CAREFUL — The src paths ("/coral.png") are relative to the web root (/public).
+//    If a file is missing, the icon silently shows as a broken image placeholder.
 const PngIcon = ({ src, alt, size = 35 }) => (
   <img src={src} alt={alt} style={{ width: size, height: size, objectFit: "contain", display: "inline-block", verticalAlign: "middle" }} />
 );
@@ -405,6 +569,11 @@ const WaveImg       = ({ size = 35 }) => <PngIcon src="/wave.png"         alt="w
 const BeachImg      = ({ size = 35 }) => <PngIcon src="/beach.png"        alt="beach"      size={size} />;
 const RecycleImg    = ({ size = 35 }) => <PngIcon src="/recycle.png"      alt="recycle"    size={size} />;
 
+// ⚠️  CAREFUL — ICON_MAP maps the string keys used in SDG_ISSUES / SOLUTIONS
+//    (e.g. "__coral__") to their React component (e.g. CoralImg).
+//    If you add a new icon type, add it here AND in the data array that uses it.
+//    Deleting a key here while it's still referenced in a data array will cause
+//    renderIcon() to fall back to rendering the raw string (e.g. "__coral__").
 const ICON_MAP = {
   "__coral__": CoralImg,
   "__bag__":   PlasticBagImg,
@@ -416,12 +585,30 @@ const ICON_MAP = {
   "__beach__": BeachImg,
   "__recycle__": RecycleImg,
 };
+
+// ❌ DANGER — Don't modify renderIcon. It safely resolves an icon key to a
+//    component, or falls back to the raw string if the key isn't found.
 const renderIcon = (icon, size = 35) => {
   const Comp = ICON_MAP[icon];
   return Comp ? <Comp size={size} /> : icon;
 };
 
 // ─── BUBBLE LAYER ──────────────────────────────────────────────────────────
+// ✅ SAFE — Renders floating bubble decorations over the page background.
+//    The bubbles are generated ONCE using useRef so they don't re-randomize
+//    on every render (which would cause flickering).
+//
+//    count   = total number of bubbles (default: 18). Pass a different number
+//              when using <Bubbles count={22} /> in page components.
+//    left    = random horizontal position (0–95% of viewport width)
+//    size    = random diameter in px (4–14px)
+//    duration = how many seconds one rise takes (8–22s, random per bubble)
+//    delay   = animation start delay so they don't all appear at once (0–12s)
+//    bottom  = starting vertical position, slightly below the fold
+//
+// ✅ SAFE — To change bubble count on a specific page, edit the count= prop
+//    in that page's JSX (e.g. <Bubbles count={30} /> for more bubbles).
+// ✅ SAFE — To change bubble colours, edit the .bubble CSS class above.
 function Bubbles({ count = 18 }) {
   const bubbles = useRef(
     Array.from({ length: count }, (_, i) => ({
@@ -449,6 +636,16 @@ function Bubbles({ count = 18 }) {
 }
 
 // ─── CAUSTIC LIGHT ────────────────────────────────────────────────────────
+// ✅ SAFE — Purely decorative underwater light shimmer effect.
+//    Renders 5 radial-gradient ellipses + 3 vertical light beams that pulse
+//    using the causticShimmer / caustic2 CSS animations.
+//    position: absolute means it fills its parent container without affecting layout.
+//    pointer-events: none means it doesn't block clicks.
+//
+// ✅ SAFE — You can remove <CausticLight /> from any page's JSX to turn it off
+//    for that page. It's used inside the HomePage hero section.
+// ✅ SAFE — Adjust opacity values (the "0.08", "0.04" etc.) to make it
+//    stronger or more subtle.
 function CausticLight() {
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
@@ -485,8 +682,26 @@ function CausticLight() {
 }
 
 // ─── NAVBAR ───────────────────────────────────────────────────────────────
+// ✅ SAFE — PAGES is the list of navigation links shown in the navbar and footer.
+//    The strings here MUST exactly match the case names in App's renderPage() switch
+//    statement below (e.g. "About SDG14" matches case "About SDG14":).
+// ⚠️  CAREFUL — If you rename a page here, you must also rename it in renderPage().
 const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 
+// ⚠️  CAREFUL — Navbar component. Receives:
+//    current       = active page name (highlights the matching nav button)
+//    onNav(page)   = called when a nav link is clicked to change pages
+//    reducedMotion = whether animations are disabled (drives the MOTION button label)
+//    onToggleMotion= called when MOTION button is clicked
+//
+//    scrolled state: turns true when user scrolls >30px, making the nav
+//    background fully opaque (better readability against content).
+//    mobileOpen state: controls the hamburger dropdown on small screens.
+//
+// ✅ SAFE — Edit text labels, colours, font sizes inside the JSX.
+// ✅ SAFE — Change the coral.scottreule.com URL to point to a different simulator.
+// ❌ DANGER — Don't remove the onNav() calls or the active className logic —
+//    that's what makes navigation work.
 function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -616,6 +831,23 @@ function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
 }
 
 // ─── HOME PAGE ────────────────────────────────────────────────────────────
+// ✅ SAFE — Hero landing page. Contains:
+//    - SDG badge pill
+//    - "WAVES WITHOUT WASTE" heading
+//    - Central idea quote
+//    - CTA buttons (Explore + Launch Simulator)
+//    - Lines of Inquiry (LOI) cards
+//
+//    The `visible` state triggers the staggered entrance animations.
+//    Each element has animationDelay: "0.Xs" so they appear one after another.
+//
+// ✅ SAFE — Edit the hero quote text (line ~709), button labels, or LOI cards.
+// ✅ SAFE — Change the lois array to update the LOI card titles and descriptions.
+// ⚠️  CAREFUL — The hero background is set directly in style={{ background: ... }}
+//    on the outer div (not from body CSS). This is intentional so the hero has
+//    a consistent dark backdrop even while the body gradient shifts behind it.
+//    If you want the gradient to show through the hero, change that background
+//    value to "transparent".
 function HomePage({ onNav }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => { setTimeout(() => setVisible(true), 80); }, []);
@@ -749,6 +981,15 @@ function HomePage({ onNav }) {
 }
 
 // ─── ABOUT PAGE ───────────────────────────────────────────────────────────
+// ✅ SAFE — "About SDG14" page. Contains:
+//    - Section header (label/title/subtitle)
+//    - "What is SDG 14?" text block (rivet-panel)
+//    - 4 Field Dossier threat cards (pulled from SDG_ISSUES array above)
+//    - Simulator callout box (glass-panel)
+//
+// ✅ SAFE — Edit the descriptive text inside the rivet-panel directly.
+// ✅ SAFE — Update the threat cards by editing the SDG_ISSUES array at the top.
+// ✅ SAFE — Change the simulator URL in the "Launch Simulator" button.
 function AboutPage() {
   return (
     <div className="page-enter" style={{ minHeight: "100vh", padding: "100px 24px 60px", maxWidth: 1060, margin: "0 auto" }}>
@@ -843,6 +1084,15 @@ function AboutPage() {
 }
 
 // ─── DATA PAGE ────────────────────────────────────────────────────────────
+// ✅ SAFE — CustomTooltip renders the popup that appears when you hover a chart.
+//    active = whether the tooltip is currently shown
+//    payload = array of data values at the hovered point
+//    label   = X-axis value at hovered point (the year)
+//    unit    = appended after the number (e.g. " Mt" for plastic chart)
+//
+// ⚠️  CAREFUL — payload[0].value gives the first data series' value.
+//    The combined chart (2 series) uses a formatter prop directly on <Tooltip>
+//    instead of CustomTooltip, so this component is only used by the bar chart.
 const CustomTooltip = ({ active, payload, label, unit }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -859,6 +1109,20 @@ const CustomTooltip = ({ active, payload, label, unit }) => {
   );
 };
 
+// ✅ SAFE — "Data & Evidence" page. Contains:
+//    - 4 stat cards (big numbers pulled from the stats array inside)
+//    - "Temperature vs Coverage" combined chart (uses combinedData)
+//    - "Plastic Ocean Entry" bar chart (uses plasticData)
+//    - Data attribution note at the bottom
+//
+// ✅ SAFE — Edit the stats array values, labels, and colours.
+// ✅ SAFE — Edit the attribution text at the bottom.
+// ⚠️  CAREFUL — Chart data comes from the module-level arrays (tempData, coralData,
+//    plasticData, combinedData) defined near the top of the file.
+//    Edit those arrays to change chart values.
+// ❌ DANGER — The chart components (ComposedChart, BarChart etc.) reference
+//    specific dataKey names ("t", "c", "p"). If you rename a property in the
+//    data arrays, you must also update the matching dataKey= prop in the chart JSX.
 function DataPage() {
   const stats = [
     { value: "15–30%", label: "Of coral reefs already degraded or destroyed", color: T.coral, icon: "__coral__" },
@@ -968,6 +1232,15 @@ function DataPage() {
 }
 
 // ─── SOLUTIONS PAGE ───────────────────────────────────────────────────────
+// ✅ SAFE — "Solutions" page. Contains:
+//    - 4 solution cards (pulled from SOLUTIONS array at the top)
+//    - A photo placeholder box (replace the dashed box with a real <img>)
+//
+// ✅ SAFE — Edit solution content via the SOLUTIONS array at the top of the file.
+// ✅ SAFE — To add a real photo: replace the placeholder <div> with:
+//    <img src="/your-photo.jpg" alt="Beach clean-up" style={{ width:"100%",
+//    borderRadius:10, aspectRatio:"16/9", objectFit:"cover" }} />
+//    (drop the image in the /public folder first)
 function SolutionsPage() {
   return (
     <div className="page-enter" style={{ minHeight: "100vh", padding: "100px 24px 60px", maxWidth: 1060, margin: "0 auto" }}>
@@ -1028,6 +1301,13 @@ function SolutionsPage() {
 }
 
 // ─── SECTION HEADER ───────────────────────────────────────────────────────
+// ✅ SAFE — Reusable centred heading block used at the top of each page.
+//    label = small all-caps pill text (e.g. "About the Project")
+//    title = large heading (e.g. "SDG 14: Life Below Water")
+//    sub   = smaller subtitle paragraph beneath
+//
+// ✅ SAFE — Edit the text by changing the props passed to <SectionHeader>
+//    in each page component, not here.
 function SectionHeader({ label, title, sub }) {
   return (
     <div style={{ textAlign: "center", marginBottom: 44 }}>
@@ -1059,6 +1339,14 @@ function SectionHeader({ label, title, sub }) {
 }
 
 // ─── FOOTER ───────────────────────────────────────────────────────────────
+// ✅ SAFE — Site footer. Contains:
+//    - Project name + coral icon
+//    - "IB PYP Exhibition · SDG 14 · [year]" — year is auto-generated
+//    - Navigation links (from PAGES array)
+//    - Team names (hardcoded string at the bottom)
+//
+// ✅ SAFE — Update the team credits string (last line inside the footer div).
+// ✅ SAFE — The year is live: new Date().getFullYear() — no need to update it.
 function Footer({ onNav }) {
   return (
     <footer style={{
@@ -1095,17 +1383,39 @@ function Footer({ onNav }) {
 }
 
 // ─── APP ──────────────────────────────────────────────────────────────────
+// ❌ DANGER — Root component. Manages all navigation and global state.
+//    Do not move or rename this function — it is the default export that
+//    src/main.jsx imports and mounts into the page.
+//
+//    page          = which page is currently shown (default: "Home")
+//    key           = increments on every navigation to force a full re-mount
+//                    of the page component, re-triggering its enter animation
+//    reducedMotion = when true, adds "reduced-motion" class to the root div,
+//                    which the CSS uses to disable all animations (see CSS above)
+//
+//    navigate(p)   = the function passed as onNav to Navbar, Footer, and pages.
+//                    Always use this to change pages — never setPage() directly —
+//                    because navigate also scrolls to the top and bumps key.
+//
+// ⚠️  CAREFUL — The switch(page) cases must exactly match the strings in PAGES[].
+//    If you add a new page, add both a case here AND an entry in PAGES above.
+//
+// ✅ SAFE — The wrapper <div> background is "transparent" so the animated body
+//    gradient shows through. Don't change it back to a solid colour.
 export default function App() {
   const [page, setPage] = useState("Home");
   const [key, setKey] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
 
+  // ❌ DANGER — navigate() is memoised with useCallback so it doesn't re-create
+  //    on every render. Don't inline this into JSX props.
   const navigate = useCallback((p) => {
     setPage(p);
     setKey(k => k + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  // ⚠️  CAREFUL — Add a new page here AND in the PAGES array above.
   const renderPage = () => {
     switch(page) {
       case "Home":             return <HomePage onNav={navigate} />;
@@ -1118,12 +1428,27 @@ export default function App() {
 
   return (
     <>
+      {/* ✅ SAFE — Injects the entire `css` string as a <style> tag in the <head>.
+          This is how all the class names (.glass-panel etc.) become available. */}
       <style>{css}</style>
-      <div className={reducedMotion ? "reduced-motion" : ""} style={{ minHeight: "100vh", background: T.abyss, position: "relative" }}>
+
+      {/* ⚠️  CAREFUL — Root wrapper div.
+          background: transparent lets the animated body gradient show through.
+          reducedMotion adds "reduced-motion" class which kills all CSS animations.
+          Don't change position: relative — it's the positioning context for
+          absolute children like CausticLight. */}
+      <div className={reducedMotion ? "reduced-motion" : ""} style={{ minHeight: "100vh", background: "transparent", position: "relative" }}>
+
+        {/* ✅ SAFE — Navbar stays fixed at the top across all pages */}
         <Navbar current={page} onNav={navigate} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
+
+        {/* ✅ SAFE — key={key} forces a full re-mount on navigation, which
+            re-triggers the .page-enter entrance animation on every page change */}
         <main key={key}>
           {renderPage()}
         </main>
+
+        {/* ✅ SAFE — Footer rendered below all page content */}
         <Footer onNav={navigate} />
       </div>
     </>
