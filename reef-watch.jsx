@@ -1646,9 +1646,9 @@ function PinScreen({ onUnlock }) {
   // Track when the PIN screen first appeared (or reset after bot rejection)
   const startTimeRef = useRef(Date.now());
 
-  // Stable random positions — generated once per mount, never on re-render
-  const starsRef = useRef(null);
-  if (!starsRef.current) starsRef.current = generateStarPositions();
+  // Positions in state so setPositions() triggers a re-render + CSS transition to new spots
+  const [positions, setPositions] = useState(() => generateStarPositions());
+  const reshuffle = () => setPositions(generateStarPositions());
 
   const press = (d) => {
     if (input.length >= 5) return;
@@ -1667,7 +1667,8 @@ function PinScreen({ onUnlock }) {
             setInput("");
             setShake(false);
             setBotMsg("");
-            startTimeRef.current = Date.now(); // restart the 7-second window
+            startTimeRef.current = Date.now();
+            reshuffle();
           }, 1800);
         } else {
           setTimeout(() => onUnlock(), 300);
@@ -1677,7 +1678,8 @@ function PinScreen({ onUnlock }) {
         setTimeout(() => {
           setInput("");
           setShake(false);
-          startTimeRef.current = Date.now(); // wrong PIN resets the 7-second bot window
+          startTimeRef.current = Date.now();
+          reshuffle();
         }, 700);
       }
     }
@@ -1709,7 +1711,7 @@ function PinScreen({ onUnlock }) {
       `}</style>
 
       {/* ── Scattered star buttons ────────────────────────────────────────────── */}
-      {starsRef.current.map(({ key, x, y, size }, idx) => {
+      {positions.map(({ key, x, y, size }, idx) => {
         const isDel = key === "←";
         const delay = `${-idx * 0.27}s`;
         const glowSize = size * 3.2;
@@ -1724,6 +1726,7 @@ function PinScreen({ onUnlock }) {
               transform: "translate(-50%, -50%)",
               width: size, height: size,
               cursor: "pointer", userSelect: "none", zIndex: 5,
+              transition: "left 1.5s ease, top 1.5s ease",
             }}
           >
             {isDel ? (
