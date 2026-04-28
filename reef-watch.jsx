@@ -691,7 +691,9 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 
 // ⚠️  CAREFUL — Navbar component. Receives:
 //    current       = active page name (highlights the matching nav button)
-//    onNav(page)   = called when a nav link or logo is clicked to change pages
+//    onNav(page)   = called when a nav link is clicked to change pages
+//    onLock()      = called when the coral logo is clicked — clears session and
+//                    returns the user to the PIN screen
 //    reducedMotion = whether animations are disabled (drives the MOTION button label)
 //    onToggleMotion= called when MOTION button is clicked
 //
@@ -703,7 +705,7 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 // ✅ SAFE — Change the coral.scottreule.com URL to point to a different simulator.
 // ❌ DANGER — Don't remove the onNav() calls or the active className logic —
 //    that's what makes navigation work.
-function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
+function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -726,8 +728,8 @@ function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
     }}>
       {/* Main bar */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 62, gap: 12 }}>
-        {/* Logo icon — click to go home */}
-        <div onClick={() => { onNav("Home"); setMobileOpen(false); }} style={{ cursor: "pointer", flexShrink: 0 }}>
+        {/* Logo icon — click to lock the site and return to PIN screen */}
+        <div onClick={() => { setMobileOpen(false); onLock(); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <div style={{
             width: 34, height: 34,
             background: "linear-gradient(135deg, #0d3a54, #1a6a8a)",
@@ -1998,7 +2000,7 @@ export default function App() {
       <div className={reducedMotion ? "reduced-motion" : ""} style={{ minHeight: "100vh", background: "transparent", position: "relative" }}>
 
         {/* ✅ SAFE — Navbar stays fixed at the top across all pages */}
-        <Navbar current={page} onNav={navigate} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
+        <Navbar current={page} onNav={navigate} onLock={lock} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
 
         {/* ✅ SAFE — key={key} forces a full re-mount on navigation, which
             re-triggers the .page-enter entrance animation on every page change */}
