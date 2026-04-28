@@ -691,9 +691,7 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 
 // ⚠️  CAREFUL — Navbar component. Receives:
 //    current       = active page name (highlights the matching nav button)
-//    onNav(page)   = called when a nav link is clicked to change pages
-//    onLock()      = called when the coral logo is clicked — clears cookie + sessionStorage
-//                    and returns the user to the PIN screen
+//    onNav(page)   = called when a nav link or logo is clicked to change pages
 //    reducedMotion = whether animations are disabled (drives the MOTION button label)
 //    onToggleMotion= called when MOTION button is clicked
 //
@@ -705,7 +703,7 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 // ✅ SAFE — Change the coral.scottreule.com URL to point to a different simulator.
 // ❌ DANGER — Don't remove the onNav() calls or the active className logic —
 //    that's what makes navigation work.
-function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
+function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -728,8 +726,8 @@ function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
     }}>
       {/* Main bar */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 62, gap: 12 }}>
-        {/* Logo icon — click to lock the site */}
-        <div onClick={() => { setMobileOpen(false); onLock(); }} style={{ cursor: "pointer", flexShrink: 0 }}>
+        {/* Logo icon — click to go home */}
+        <div onClick={() => { onNav("Home"); setMobileOpen(false); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <div style={{
             width: 34, height: 34,
             background: "linear-gradient(135deg, #0d3a54, #1a6a8a)",
@@ -1557,20 +1555,20 @@ function Footer({ onNav }) {
 
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
 // ❌ DANGER — PIN logic. CORRECT_PIN and KEY_MAP must stay in sync.
-//    ௹ is mapped to the ASCII char "x" so string comparison works reliably —
+//    ❦ is mapped to the ASCII char "x" so string comparison works reliably —
 //    the Tamil Rupee Sign can encode differently across environments.
 //    If you change the PIN, update CORRECT_PIN AND the matching KEY_MAP entry.
-//    Current PIN: 787057௹  (internal: "787057x", 7 digits)
+//    Current PIN: 787057❦  (internal: "787057x", 7 digits)
 //
 // ⚠️  CAREFUL — Bot protection: correct PIN entered in under 7 seconds is rejected.
 //    The threshold is Date.now() - startTimeRef.current < 7_000.
 //    startTimeRef resets after each bot rejection so the window restarts.
 //
-// ✅ SAFE — To change the PIN, update CORRECT_PIN (use "x" for ௹).
+// ✅ SAFE — To change the PIN, update CORRECT_PIN (use "x" for ❦).
 // ✅ SAFE — Star positions are randomised on every page load via generateStarPositions().
 // ✅ SAFE — Lockout durations (seconds). First 10 wrong attempts = grace period, then
 //    each subsequent wrong attempt steps through this list. Last entry repeats forever.
-const KEY_MAP     = { "௹": "x" };
+const KEY_MAP     = { "❦": "x" };
 const CORRECT_PIN = "787057x";
 
 const LOCKOUT_DURATIONS_SEC = [
@@ -1607,7 +1605,7 @@ const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 8
 //    Unsafe zones [x1%, y1%, x2%, y2%] match the actual header elements at that size.
 function generateStarPositions() {
   // "←" is the delete key — plain arrow renders as text, not as an iOS key-cap glyph
-  const keys = ["1","2","3","4","5","6","7","8","9","0","←","௹"];
+  const keys = ["1","2","3","4","5","6","7","8","9","0","←","❦"];
   const VW = 390, VH = 844;            // reference viewport for distance calc
   const MIN_SIZE = 68, MAX_SIZE = 108; // px
   const PAD = 18;                      // extra gap between stars
@@ -1721,7 +1719,7 @@ function PinScreen({ onUnlock }) {
   //    too-fast correct PIN does NOT increment failCount or trigger lockout.
   const press = (d) => {
     if (isLocked || input.length >= 7) return;
-    // Map display characters to their internal PIN values (handles ௹ → "x")
+    // Map display characters to their internal PIN values (handles ❦ → "x")
     const val  = KEY_MAP[d] ?? d;
     const next = input + val;
     setInput(next);
@@ -2011,7 +2009,7 @@ export default function App() {
       <div className={reducedMotion ? "reduced-motion" : ""} style={{ minHeight: "100vh", background: "transparent", position: "relative" }}>
 
         {/* ✅ SAFE — Navbar stays fixed at the top across all pages */}
-        <Navbar current={page} onNav={navigate} onLock={lock} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
+        <Navbar current={page} onNav={navigate} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
 
         {/* ✅ SAFE — key={key} forces a full re-mount on navigation, which
             re-triggers the .page-enter entrance animation on every page change */}
