@@ -692,8 +692,8 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 // ⚠️  CAREFUL — Navbar component. Receives:
 //    current       = active page name (highlights the matching nav button)
 //    onNav(page)   = called when a nav link is clicked to change pages
-//    onLock()      = called when the coral logo is clicked — clears cookie + sessionStorage
-//                    and returns the user to the PIN screen
+//    onLock()      = called when the coral logo is clicked — clears session and
+//                    returns the user to the PIN screen
 //    reducedMotion = whether animations are disabled (drives the MOTION button label)
 //    onToggleMotion= called when MOTION button is clicked
 //
@@ -728,7 +728,7 @@ function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
     }}>
       {/* Main bar */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 62, gap: 12 }}>
-        {/* Logo icon — click to lock the site */}
+        {/* Logo icon — click to lock the site and return to PIN screen */}
         <div onClick={() => { setMobileOpen(false); onLock(); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <div style={{
             width: 34, height: 34,
@@ -1933,20 +1933,9 @@ function PinScreen({ onUnlock }) {
             textShadow: "0 0 16px rgba(255,68,68,0.5)",
           }}>Access Locked</p>
           <p style={{
-            fontFamily: "Georgia, serif",
-            fontSize: "clamp(48px, 12vw, 72px)",
-            fontWeight: "bold", color: "#d4e5f7",
-            letterSpacing: 2, lineHeight: 1,
-            textShadow: "0 0 30px rgba(90,196,224,0.3)",
-          }}>{formatCountdown(secondsLeft)}</p>
-          <p style={{
-            fontFamily: "Georgia, serif", fontSize: 11,
+            fontFamily: "Georgia, serif", fontSize: 13,
             color: "#3a5a7a", letterSpacing: 1, marginTop: 4,
-          }}>Try again when the timer reaches zero</p>
-          <p style={{
-            fontFamily: "Georgia, serif", fontSize: 10,
-            color: "#1e3a4a", letterSpacing: 0.5, marginTop: 8,
-          }}>{failCount} failed attempt{failCount !== 1 ? "s" : ""}</p>
+          }}>Too many incorrect attempts. Try again later.</p>
         </div>
       )}
     </div>
