@@ -1931,20 +1931,9 @@ function PinScreen({ onUnlock }) {
             textShadow: "0 0 16px rgba(255,68,68,0.5)",
           }}>Access Locked</p>
           <p style={{
-            fontFamily: "Georgia, serif",
-            fontSize: "clamp(48px, 12vw, 72px)",
-            fontWeight: "bold", color: "#d4e5f7",
-            letterSpacing: 2, lineHeight: 1,
-            textShadow: "0 0 30px rgba(90,196,224,0.3)",
-          }}>{formatCountdown(secondsLeft)}</p>
-          <p style={{
-            fontFamily: "Georgia, serif", fontSize: 11,
+            fontFamily: "Georgia, serif", fontSize: 13,
             color: "#3a5a7a", letterSpacing: 1, marginTop: 4,
-          }}>Try again when the timer reaches zero</p>
-          <p style={{
-            fontFamily: "Georgia, serif", fontSize: 10,
-            color: "#1e3a4a", letterSpacing: 0.5, marginTop: 8,
-          }}>{failCount} failed attempt{failCount !== 1 ? "s" : ""}</p>
+          }}>Too many incorrect attempts. Try again later.</p>
         </div>
       )}
     </div>
