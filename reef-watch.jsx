@@ -1557,20 +1557,20 @@ function Footer({ onNav }) {
 
 // ─── PIN SCREEN ───────────────────────────────────────────────────────────────
 // ❌ DANGER — PIN logic. CORRECT_PIN and KEY_MAP must stay in sync.
-//    ❦ is mapped to the ASCII char "x" so string comparison works reliably —
+//    ௹ is mapped to the ASCII char "x" so string comparison works reliably —
 //    the Tamil Rupee Sign can encode differently across environments.
 //    If you change the PIN, update CORRECT_PIN AND the matching KEY_MAP entry.
-//    Current PIN: 787057❦  (internal: "787057x", 7 digits)
+//    Current PIN: 787057௹  (internal: "787057x", 7 digits)
 //
 // ⚠️  CAREFUL — Bot protection: correct PIN entered in under 7 seconds is rejected.
 //    The threshold is Date.now() - startTimeRef.current < 7_000.
 //    startTimeRef resets after each bot rejection so the window restarts.
 //
-// ✅ SAFE — To change the PIN, update CORRECT_PIN (use "x" for ❦).
+// ✅ SAFE — To change the PIN, update CORRECT_PIN (use "x" for ௹).
 // ✅ SAFE — Star positions are randomised on every page load via generateStarPositions().
 // ✅ SAFE — Lockout durations (seconds). First 10 wrong attempts = grace period, then
 //    each subsequent wrong attempt steps through this list. Last entry repeats forever.
-const KEY_MAP     = { "❦": "x" };
+const KEY_MAP     = { "௹": "x" };
 const CORRECT_PIN = "787057x";
 
 const LOCKOUT_DURATIONS_SEC = [
@@ -1607,7 +1607,7 @@ const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 8
 //    Unsafe zones [x1%, y1%, x2%, y2%] match the actual header elements at that size.
 function generateStarPositions() {
   // "←" is the delete key — plain arrow renders as text, not as an iOS key-cap glyph
-  const keys = ["1","2","3","4","5","6","7","8","9","0","←","❦"];
+  const keys = ["1","2","3","4","5","6","7","8","9","0","←","௹"];
   const VW = 390, VH = 844;            // reference viewport for distance calc
   const MIN_SIZE = 68, MAX_SIZE = 108; // px
   const PAD = 18;                      // extra gap between stars
@@ -1721,7 +1721,7 @@ function PinScreen({ onUnlock }) {
   //    too-fast correct PIN does NOT increment failCount or trigger lockout.
   const press = (d) => {
     if (isLocked || input.length >= 7) return;
-    // Map display characters to their internal PIN values (handles ❦ → "x")
+    // Map display characters to their internal PIN values (handles ௹ → "x")
     const val  = KEY_MAP[d] ?? d;
     const next = input + val;
     setInput(next);
