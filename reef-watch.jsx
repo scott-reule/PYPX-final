@@ -1560,6 +1560,7 @@ function Footer({ onNav }) {
 //    ௹ is mapped to the ASCII char "x" so string comparison works reliably —
 //    the Tamil Rupee Sign can encode differently across environments.
 //    If you change the PIN, update CORRECT_PIN AND the matching KEY_MAP entry.
+//    Current PIN: 787057௹  (internal: "787057x", 7 digits)
 //
 // ⚠️  CAREFUL — Bot protection: correct PIN entered in under 7 seconds is rejected.
 //    The threshold is Date.now() - startTimeRef.current < 7_000.
@@ -1570,7 +1571,7 @@ function Footer({ onNav }) {
 // ✅ SAFE — Lockout durations (seconds). First 10 wrong attempts = grace period, then
 //    each subsequent wrong attempt steps through this list. Last entry repeats forever.
 const KEY_MAP     = { "௹": "x" };
-const CORRECT_PIN = "x0809";
+const CORRECT_PIN = "787057x";
 
 const LOCKOUT_DURATIONS_SEC = [
   10, 60, 300, 600, 1800, 3600, 10800, 21600, 43200,
@@ -1719,12 +1720,12 @@ function PinScreen({ onUnlock }) {
   // ⚠️  CAREFUL — Main key-press handler. Bot check runs BEFORE fail counter so a
   //    too-fast correct PIN does NOT increment failCount or trigger lockout.
   const press = (d) => {
-    if (isLocked || input.length >= 5) return;
+    if (isLocked || input.length >= 7) return;
     // Map display characters to their internal PIN values (handles ௹ → "x")
     const val  = KEY_MAP[d] ?? d;
     const next = input + val;
     setInput(next);
-    if (next.length === 5) {
+    if (next.length === 7) {
       if (next === CORRECT_PIN) {
         const elapsed = Date.now() - startTimeRef.current;
         if (elapsed < 7_000) {
@@ -1894,7 +1895,7 @@ function PinScreen({ onUnlock }) {
 
         {/* PIN dots */}
         <div className={shake ? "pin-shake" : ""} style={{ display: "flex", gap: 18 }}>
-          {[0,1,2,3,4].map(i => (
+          {[0,1,2,3,4,5,6].map(i => (
             <div key={i} style={{
               width: 14, height: 14, borderRadius: "50%",
               border: `2px solid ${shake ? "#ff4444" : "#3a8aaa"}`,
