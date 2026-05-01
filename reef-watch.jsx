@@ -1555,388 +1555,117 @@ function Footer({ onNav }) {
 // ✅ SAFE — The wrapper <div> background is "transparent" so the animated body
 //    gradient shows through. Don't change it back to a solid colour.
 
-// ─── PIN SCREEN ───────────────────────────────────────────────────────────────
-// ❌ DANGER — PIN logic. CORRECT_PIN and KEY_MAP must stay in sync.
-//    ௹ is mapped to the ASCII char "x" so string comparison works reliably —
-//    the Tamil Rupee Sign can encode differently across environments.
-//    If you change the PIN, update CORRECT_PIN AND the matching KEY_MAP entry.
-//    Current PIN: 787057௹  (internal: "787057x", 7 digits)
-//
-// ⚠️  CAREFUL — Bot protection: correct PIN entered in under 7 seconds is rejected.
-//    The threshold is Date.now() - startTimeRef.current < 7_000.
-//    startTimeRef resets after each bot rejection so the window restarts.
-//
-// ✅ SAFE — To change the PIN, update CORRECT_PIN (use "x" for ௹).
-// ✅ SAFE — Star positions are randomised on every page load via generateStarPositions().
-// ✅ SAFE — Lockout durations (seconds). First 10 wrong attempts = grace period, then
-//    each subsequent wrong attempt steps through this list. Last entry repeats forever.
-const KEY_MAP     = { "௹": "x" };
-const CORRECT_PIN = "787057x";
-
-const LOCKOUT_DURATIONS_SEC = [
-  10, 60, 300, 600, 1800, 3600, 10800, 21600, 43200,
-  86400, 172800, 259200, 432000, 604800, 1209600,
-  2592000, 5184000, 10368000, 15552000, 31536000,
-];
-
-// ✅ SAFE — Converts a raw second count to a human-readable string ("10s", "5m 30s",
-//    "2h 15m", "3d 4h", "2mo 5d", "1y 3mo"). Used by the lockout overlay.
-function formatCountdown(sec) {
-  if (sec <= 0) return "";
-  const y  = Math.floor(sec / 31536000);
-  const mo = Math.floor((sec % 31536000) / 2592000);
-  const d  = Math.floor((sec % 2592000)  / 86400);
-  const h  = Math.floor((sec % 86400)    / 3600);
-  const m  = Math.floor((sec % 3600)     / 60);
-  const s  = sec % 60;
-  if (y  > 0) return `${y}y ${mo > 0 ? mo + "mo " : ""}`.trim();
-  if (mo > 0) return `${mo}mo ${d > 0 ? d + "d" : ""}`.trim();
-  if (d  > 0) return `${d}d ${h > 0 ? h + "h" : ""}`.trim();
-  if (h  > 0) return `${h}h ${m > 0 ? m + "m" : ""}`.trim();
-  if (m  > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
-
-// 8-pointed pinwheel star clip-path (outer points offset inward asymmetrically)
-const STAR = "polygon(50% 4%, 60% 35%, 82% 18%, 68% 46%, 96% 50%, 65% 60%, 83% 82%, 54% 68%, 50% 96%, 40% 65%, 17% 83%, 32% 54%, 4% 50%, 35% 40%, 18% 18%, 46% 32%)";
-
-// ✅ SAFE — Generates random (x%, y%) positions for all 12 PIN keys.
-//    Uses rejection sampling with collision avoidance and element-specific unsafe zones.
-//    Positions are stable per mount (stored in useRef) but randomise on page reload.
-// ⚠️  CAREFUL — Coordinates are in percentage units against a 390×844 reference viewport.
-//    Unsafe zones [x1%, y1%, x2%, y2%] match the actual header elements at that size.
-function generateStarPositions() {
-  // "←" is the delete key — plain arrow renders as text, not as an iOS key-cap glyph
-  const keys = ["1","2","3","4","5","6","7","8","9","0","←","௹"];
-  const VW = 390, VH = 844;            // reference viewport for distance calc
-  const MIN_SIZE = 68, MAX_SIZE = 108; // px
-  const PAD = 18;                      // extra gap between stars
-
-  // Unsafe rectangles [x1%, y1%, x2%, y2%] for logo, title, subtitle, dots.
-  // Stars avoid landing with their centre inside these zones (expanded by half star size).
-  const UNSAFE = [
-    [32, 7,  68, 21],   // coral logo (centred, small)
-    [5,  21, 95, 31],   // "WAVES WITHOUT WASTE" title
-    [22, 31, 78, 38],   // "Enter PIN to continue" subtitle
-    [20, 38, 80, 48],   // 5 PIN dots row
-  ];
-
-  const placed = [];
-
-  for (const key of keys) {
-    const size = MIN_SIZE + Math.random() * (MAX_SIZE - MIN_SIZE);
-    // Keep star fully inside viewport edges
-    const halfWp = (size / VW) * 50;
-    const halfHp = (size / VH) * 50;
-    const xMin = halfWp + 2, xMax = 100 - halfWp - 2;
-    const yMin = halfHp + 2,  yMax = 100 - halfHp - 2;
-
-    let best = { x: xMin + Math.random() * (xMax - xMin), y: yMin + Math.random() * (yMax - yMin) };
-    let bestScore = -Infinity;
-
-    for (let t = 0; t < 120; t++) {
-      const x = xMin + Math.random() * (xMax - xMin);
-      const y = yMin + Math.random() * (yMax - yMin);
-
-      // Reject if star centre (plus half-size buffer) lands inside any unsafe zone
-      const blocked = UNSAFE.some(([x1, y1, x2, y2]) =>
-        x > x1 - halfWp && x < x2 + halfWp &&
-        y > y1 - halfHp && y < y2 + halfHp
-      );
-      if (blocked) continue;
-
-      // Score = minimum clearance to all already-placed stars
-      let minClear = Infinity;
-      for (const p of placed) {
-        const dx = (x - p.x) / 100 * VW;
-        const dy = (y - p.y) / 100 * VH;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const needed = (size + p.size) / 2 + PAD;
-        minClear = Math.min(minClear, dist - needed);
-      }
-      if (placed.length === 0) minClear = 999;
-
-      if (minClear > 0) { best = { x, y }; break; }   // no overlap — use it
-      if (minClear > bestScore) { bestScore = minClear; best = { x, y }; }
-    }
-
-    placed.push({ key, x: best.x, y: best.y, size });
-  }
-
-  return placed;
-}
-
-// ── PIN SCREEN COMPONENT ──────────────────────────────────────────────────────
-// ✅ SAFE — Full-screen gate rendered until onUnlock() is called. All lockout
-//    and fail state lives here and is also mirrored in localStorage so a page
-//    reload cannot clear an active lockout.
+// ─── CAPTCHA GATE ─────────────────────────────────────────────────────────────
+// ✅ SAFE — Full-screen gate rendered until onUnlock() is called.
+//    Redirects the user to captcha.scottreule.com, which returns them here
+//    with a captcha_token query param that is then verified server-side.
 // ⚠️  CAREFUL — onUnlock() must set both sessionStorage AND the wwwUnlocked
 //    cookie so the Vercel Edge Middleware recognises the unlock for /cleanup/*.
-function PinScreen({ onUnlock }) {
-  // UI state — input accumulates typed digits; shake triggers the red jitter animation
-  const [input, setInput]   = useState("");
-  const [shake, setShake]   = useState(false);
-  const [botMsg, setBotMsg] = useState(""); // bot-protection rejection message
+// ❌ DANGER — Never grant access based on the captcha_passed URL param alone.
+//    Always verify captcha_token via /api/verify (server-side) before calling
+//    onUnlock(). The URL params are informational only and trivially spoofable.
+function CaptchaGate({ onUnlock }) {
+  // "idle" | "checking" | "bot" | "pending" | "error"
+  const [status, setStatus] = useState("idle");
 
-  // Positions in state so setPositions() triggers a re-render + CSS transition to new spots
-  const [positions, setPositions] = useState(() => generateStarPositions());
-  const reshuffle = () => setPositions(generateStarPositions());
-
-  // ── Lockout state — persisted in localStorage so reload doesn't reset it ──
-  const [failCount,   setFailCount]   = useState(() => parseInt(localStorage.getItem("pinFails")       || "0", 10));
-  const [lockedUntil, setLockedUntil] = useState(() => parseInt(localStorage.getItem("pinLockedUntil") || "0", 10));
-  const [now, setNow] = useState(Date.now());
-
-  // Tick every second while locked; reshuffle stars the moment lockout expires
+  // On mount, check if we've returned from the CAPTCHA with a token in the URL
   useEffect(() => {
-    if (lockedUntil <= Date.now()) return;
-    const tick = setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      if (t >= lockedUntil) { clearInterval(tick); reshuffle(); }
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [lockedUntil]); // reshuffle is stable (setPositions is a stable setter)
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get("captcha_token");
+    if (!token) return;
 
-  // Derived from persisted lockout state — re-computed on every render via the `now` tick
-  const isLocked    = now < lockedUntil;
-  const secondsLeft = Math.ceil((lockedUntil - now) / 1000);
+    // Remove token from the URL immediately — a reload must not re-trigger verification
+    window.history.replaceState({}, "", window.location.pathname);
+    setStatus("checking");
 
-  // Track when the PIN screen first appeared (or reset after bot rejection)
-  const startTimeRef = useRef(Date.now());
-
-  const triggerLockout = (fails) => {
-    // 1-9 = free. Every wrong attempt from 10 onward triggers a lockout.
-    // The range it falls in determines the duration: 10-29 → level 0, 30-49 → level 1, etc.
-    if (fails < 10) return;
-    const level    = Math.min(Math.floor((fails - 10) / 20), LOCKOUT_DURATIONS_SEC.length - 1);
-    const duration = LOCKOUT_DURATIONS_SEC[level] * 1000;
-    const until    = Date.now() + duration;
-    setLockedUntil(until);
-    setNow(Date.now());
-    localStorage.setItem("pinLockedUntil", until);
-  };
-
-  // ⚠️  CAREFUL — Main key-press handler. Bot check runs BEFORE fail counter so a
-  //    too-fast correct PIN does NOT increment failCount or trigger lockout.
-  const press = (d) => {
-    if (isLocked || input.length >= 7) return;
-    // Map display characters to their internal PIN values (handles ௹ → "x")
-    const val  = KEY_MAP[d] ?? d;
-    const next = input + val;
-    setInput(next);
-    if (next.length === 7) {
-      if (next === CORRECT_PIN) {
-        const elapsed = Date.now() - startTimeRef.current;
-        if (elapsed < 7_000) {
-          // ⚠️ Bot protection — correct PIN entered in under 7 seconds.
-          // Does NOT increment failCount — bot rejection is not a failed attempt.
-          setBotMsg("Too fast — please look carefully and try again.");
-          setShake(true);
-          setTimeout(() => {
-            setInput("");
-            setShake(false);
-            setBotMsg("");
-            startTimeRef.current = Date.now();
-            reshuffle();
-          }, 1800);
+    // ❌ DANGER — Verify server-side via /api/verify. Never trust captcha_passed=true
+    //    from the URL — it is trivially spoofable by editing the address bar.
+    fetch(`/api/verify?token=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .then(({ ok, verdict }) => {
+        if (ok && verdict === "human") {
+          onUnlock();
         } else {
-          // Correct PIN, not too fast — clear all lockout state and unlock
-          localStorage.removeItem("pinFails");
-          localStorage.removeItem("pinLockedUntil");
-          setTimeout(() => onUnlock(), 300);
+          setStatus(verdict === "bot" ? "bot" : verdict === "pending" ? "pending" : "error");
         }
-      } else {
-        const newFails = failCount + 1;
-        setFailCount(newFails);
-        localStorage.setItem("pinFails", newFails);
-        setShake(true);
-        setTimeout(() => {
-          setInput("");
-          setShake(false);
-          startTimeRef.current = Date.now();
-          reshuffle();
-          triggerLockout(newFails);
-        }, 700);
-      }
-    }
+      })
+      .catch(() => setStatus("error"));
+  }, []);
+
+  // ✅ SAFE — Redirect URL points back to this page so the token lands on the
+  //    same origin that /api/verify runs on.
+  const captchaUrl = `https://captcha.scottreule.com?redirect=${encodeURIComponent(window.location.origin + "/")}`;
+
+  // Shared link style used by all "try again" anchors
+  const retryStyle = {
+    fontFamily: "Georgia, serif", fontSize: 12,
+    color: "#5ac4e0", letterSpacing: 1,
+    textDecoration: "none",
   };
-  // ✅ SAFE — Removes the last entered digit; no-op while the keypad is locked.
-  const del = () => { if (!isLocked) setInput(i => i.slice(0, -1)); };
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh", overflowX: "hidden", background: "#060e1a" }}>
-      {/* Keyframes: pinShake — red jitter on wrong PIN | rgbCycle — rainbow hue rotation for
-          star glow and ⌫ | starPulse — gentle breathing on star centres. Class shortcuts
-          (.pin-shake, .rgb-star, .star-center) are applied via className to avoid inline duplication. */}
-      <style>{`
-        @keyframes pinShake {
-          0%,100% { transform: translateX(0); }
-          20% { transform: translateX(-12px); }
-          40% { transform: translateX(12px); }
-          60% { transform: translateX(-8px); }
-          80% { transform: translateX(8px); }
-        }
-        @keyframes rgbCycle {
-          0%   { filter: hue-rotate(0deg)   brightness(1.1); }
-          100% { filter: hue-rotate(360deg) brightness(1.1); }
-        }
-        @keyframes starPulse {
-          0%,100% { transform: scale(0.82); }
-          50%      { transform: scale(0.79); }
-        }
-        .pin-shake   { animation: pinShake 0.55s ease; }
-        .rgb-star    { animation: rgbCycle 3s linear infinite; }
-        .star-center { animation: starPulse 2s ease-in-out infinite; transform-origin: center; }
-        .star-wrap:active .star-center { transform: scale(0.72) !important; animation: none; }
-      `}</style>
+    <div style={{
+      minHeight: "100vh", background: "#060e1a",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      gap: 20, padding: "0 24px", textAlign: "center",
+    }}>
+      {/* ── Branding ── */}
+      <img src="/coral.png" alt="" style={{ width: 56, opacity: 0.9, marginBottom: 8 }} />
+      <p style={{
+        fontFamily: "Cinzel, Georgia, serif", fontSize: 17,
+        color: "#7fcdee", letterSpacing: 3, margin: 0,
+      }}>WAVES WITHOUT WASTE</p>
 
-      {/* ── Scattered star buttons ────────────────────────────────────────────── */}
-      {positions.map(({ key, x, y, size }, idx) => {
-        const isDel = key === "←";
-        const delay = `${-idx * 0.27}s`;
-        const glowSize = size * 3.2;
-        return (
-          <div
-            key={key}
-            className="star-wrap"
-            onClick={() => isDel ? del() : press(key)}
-            style={{
-              position: "absolute",
-              left: `${x}%`, top: `${y}%`,
-              transform: "translate(-50%, -50%)",
-              width: size, height: size,
-              cursor: "pointer", userSelect: "none", zIndex: 5,
-              transition: "left 1.5s ease, top 1.5s ease",
-            }}
-          >
-            {isDel ? (
-              /* Delete key — RGB-lit ⌫ glyph, no star shape */
-              <>
-                {/* Glow pool behind the delete key */}
-                <div className="rgb-star" style={{
-                  position: "absolute",
-                  width: glowSize, height: glowSize,
-                  top: "50%", left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  borderRadius: "50%",
-                  background: "radial-gradient(circle, rgba(255,60,200,0.38) 0%, rgba(80,0,255,0.18) 35%, transparent 70%)",
-                  animationDelay: delay,
-                  pointerEvents: "none",
-                  zIndex: -1,
-                }} />
-                {/* ⌫ glyph itself filled with cycling rainbow — the "RGB delete strip" */}
-                <div className="rgb-star" style={{
-                  position: "absolute", inset: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: size * 0.78,
-                  lineHeight: 1,
-                  background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  animationDelay: delay,
-                  pointerEvents: "none",
-                  userSelect: "none",
-                }}>⌫</div>
-              </>
-            ) : (
-              <>
-                {/* Light pool spreading out from the star onto the dark screen */}
-                <div className="rgb-star" style={{
-                  position: "absolute",
-                  width: glowSize, height: glowSize,
-                  top: "50%", left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  borderRadius: "50%",
-                  background: "radial-gradient(circle, rgba(255,60,200,0.38) 0%, rgba(80,0,255,0.18) 35%, transparent 70%)",
-                  animationDelay: delay,
-                  pointerEvents: "none",
-                  zIndex: -1,
-                }} />
-                {/* RGB conic ring — clipped to pinwheel star shape */}
-                <div className="rgb-star" style={{
-                  position: "absolute", inset: 0,
-                  clipPath: STAR,
-                  background: "conic-gradient(#ff0000, #ff7700, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-                  animationDelay: delay,
-                }} />
-                {/* Dark centre — scaled down so only the star edge glows */}
-                <div className="star-center" style={{
-                  position: "absolute", inset: 0,
-                  clipPath: STAR,
-                  background: "radial-gradient(circle at 40% 35%, #0d1f3a, #060e1a)",
-                  transformOrigin: "center",
-                }} />
-                {/* Number / special character label — scales with star size */}
-                <div style={{
-                  position: "absolute", inset: 0, zIndex: 2,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#d4e5f7",
-                  fontSize: size * 0.29,
-                  fontFamily: "Georgia, serif", fontWeight: "bold",
-                  textShadow: "0 0 10px rgba(90,196,224,0.6)",
-                  pointerEvents: "none",
-                }}>{key}</div>
-              </>
-            )}
-          </div>
-        );
-      })}
+      {/* ── Status-dependent content ── */}
+      {status === "idle" && (
+        <>
+          <p style={{ fontFamily: "Georgia, serif", fontSize: 12, color: "#3a5a7a", letterSpacing: 1, margin: 0 }}>
+            Verify you're human to continue
+          </p>
+          <a href={captchaUrl} style={{
+            display: "inline-block", marginTop: 4,
+            padding: "12px 28px",
+            fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: 1.5,
+            color: "#5ac4e0", textDecoration: "none",
+            border: "1px solid #1a4a6a", borderRadius: 4,
+            background: "rgba(90,196,224,0.06)",
+          }}>
+            Begin Verification →
+          </a>
+        </>
+      )}
 
-      {/* ── Header panel (sits above stars, pointer-events off so stars behind it stay tappable) ── */}
-      <div style={{
-        position: "relative", zIndex: 10,
-        display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: "10vh", pointerEvents: "none",
-      }}>
-        <img src="/coral.png" alt="" style={{ width: 56, marginBottom: 16, opacity: 0.9 }} />
-        <p style={{ fontFamily: "Cinzel, Georgia, serif", fontSize: 17, color: "#7fcdee", letterSpacing: 3, marginBottom: 6 }}>WAVES WITHOUT WASTE</p>
-        <p style={{ fontFamily: "Georgia, serif", fontSize: 12, color: "#3a5a7a", letterSpacing: 1, marginBottom: 36 }}>Enter PIN to continue</p>
+      {status === "checking" && (
+        <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#3a5a7a", letterSpacing: 1 }}>
+          Verifying…
+        </p>
+      )}
 
-        {/* PIN dots */}
-        <div className={shake ? "pin-shake" : ""} style={{ display: "flex", gap: 18 }}>
-          {[0,1,2,3,4,5,6].map(i => (
-            <div key={i} style={{
-              width: 14, height: 14, borderRadius: "50%",
-              border: `2px solid ${shake ? "#ff4444" : "#3a8aaa"}`,
-              background: i < input.length ? (shake ? "#ff4444" : "#5ac4e0") : "transparent",
-              transition: "background 0.15s, border-color 0.15s",
-              boxShadow: i < input.length ? `0 0 8px ${shake ? "#ff4444" : "#5ac4e0"}` : "none",
-            }} />
-          ))}
-        </div>
+      {status === "bot" && (
+        <>
+          <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#ff6644", letterSpacing: 0.5, margin: 0 }}>
+            You were identified as a bot.
+          </p>
+          <a href={captchaUrl} style={retryStyle}>Try again →</a>
+        </>
+      )}
 
-        {/* Bot-protection warning */}
-        {botMsg && (
-          <p style={{
-            marginTop: 14,
-            fontFamily: "Georgia, serif", fontSize: 12,
-            color: "#ff6644", letterSpacing: 0.5,
-            textShadow: "0 0 8px rgba(255,100,68,0.5)",
-          }}>{botMsg}</p>
-        )}
-      </div>
+      {status === "pending" && (
+        <>
+          <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#ff6644", letterSpacing: 0.5, margin: 0 }}>
+            Verification incomplete — please finish the conversation.
+          </p>
+          <a href={captchaUrl} style={retryStyle}>Continue verification →</a>
+        </>
+      )}
 
-      {/* ── Lockout overlay — covers everything when too many wrong attempts ── */}
-      {isLocked && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 50,
-          background: "rgba(4,10,20,0.96)",
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          gap: 16,
-        }}>
-          <img src="/coral.png" alt="" style={{ width: 44, opacity: 0.5, marginBottom: 8 }} />
-          <p style={{
-            fontFamily: "Cinzel, Georgia, serif", fontSize: 12,
-            color: "#ff4444", letterSpacing: 4, textTransform: "uppercase",
-            textShadow: "0 0 16px rgba(255,68,68,0.5)",
-          }}>Access Locked</p>
-          <p style={{
-            fontFamily: "Georgia, serif", fontSize: 13,
-            color: "#3a5a7a", letterSpacing: 1, marginTop: 4,
-          }}>Too many incorrect attempts. Try again later.</p>
-        </div>
+      {status === "error" && (
+        <>
+          <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#ff6644", letterSpacing: 0.5, margin: 0 }}>
+            Something went wrong. Please try again.
+          </p>
+          <a href={captchaUrl} style={retryStyle}>Try again →</a>
+        </>
       )}
     </div>
   );
@@ -1984,7 +1713,7 @@ export default function App() {
     }
   };
 
-  if (!unlocked) return <PinScreen onUnlock={unlock} />;
+  if (!unlocked) return <CaptchaGate onUnlock={unlock} />;
 
   return (
     <>
