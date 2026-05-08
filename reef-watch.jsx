@@ -692,8 +692,6 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 // ⚠️  CAREFUL — Navbar component. Receives:
 //    current       = active page name (highlights the matching nav button)
 //    onNav(page)   = called when a nav link is clicked to change pages
-//    onLock()      = called when the coral logo is clicked — clears session and
-//                    returns the user to the PIN screen
 //    reducedMotion = whether animations are disabled (drives the MOTION button label)
 //    onToggleMotion= called when MOTION button is clicked
 //
@@ -705,7 +703,7 @@ const PAGES = ["Home", "About SDG14", "Data & Evidence", "Solutions"];
 // ✅ SAFE — Change the coral.scottreule.com URL to point to a different simulator.
 // ❌ DANGER — Don't remove the onNav() calls or the active className logic —
 //    that's what makes navigation work.
-function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
+function Navbar({ current, onNav, reducedMotion, onToggleMotion }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -728,8 +726,8 @@ function Navbar({ current, onNav, onLock, reducedMotion, onToggleMotion }) {
     }}>
       {/* Main bar */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 62, gap: 12 }}>
-        {/* Logo icon — click to lock the site and return to PIN screen */}
-        <div onClick={() => { setMobileOpen(false); onLock(); }} style={{ cursor: "pointer", flexShrink: 0 }}>
+        {/* Logo icon */}
+        <div onClick={() => setMobileOpen(false)} style={{ flexShrink: 0 }}>
           <div style={{
             width: 34, height: 34,
             background: "linear-gradient(135deg, #0d3a54, #1a6a8a)",
@@ -1555,144 +1553,10 @@ function Footer({ onNav }) {
 // ✅ SAFE — The wrapper <div> background is "transparent" so the animated body
 //    gradient shows through. Don't change it back to a solid colour.
 
-// ─── CAPTCHA GATE ─────────────────────────────────────────────────────────────
-// ✅ SAFE — Full-screen gate rendered until onUnlock() is called.
-//    Redirects the user to captcha.scottreule.com, which returns them here
-//    with a captcha_token query param that is then verified server-side.
-// ⚠️  CAREFUL — onUnlock() must set both sessionStorage AND the wwwUnlocked
-//    cookie so the Vercel Edge Middleware recognises the unlock for /cleanup/*.
-// ❌ DANGER — Never grant access based on the captcha_passed URL param alone.
-//    Always verify captcha_token via /api/verify (server-side) before calling
-//    onUnlock(). The URL params are informational only and trivially spoofable.
-function CaptchaGate({ onUnlock }) {
-  // "idle" | "checking" | "bot" | "pending" | "error"
-  const [status, setStatus] = useState("idle");
-
-  // On mount, check if we've returned from the CAPTCHA with a token in the URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token  = params.get("captcha_token");
-    if (!token) return;
-
-    // Remove token from the URL immediately — a reload must not re-trigger verification
-    window.history.replaceState({}, "", window.location.pathname);
-    setStatus("checking");
-
-    // ❌ DANGER — Verify server-side via /api/verify. Never trust captcha_passed=true
-    //    from the URL — it is trivially spoofable by editing the address bar.
-    fetch(`/api/verify?token=${encodeURIComponent(token)}`)
-      .then(r => r.json())
-      .then(({ ok, verdict }) => {
-        if (ok && verdict === "human") {
-          onUnlock();
-        } else {
-          setStatus(verdict === "bot" ? "bot" : verdict === "pending" ? "pending" : "error");
-        }
-      })
-      .catch(() => setStatus("error"));
-  }, []);
-
-  // ✅ SAFE — Redirect URL points back to this page so the token lands on the
-  //    same origin that /api/verify runs on.
-  const captchaUrl = `https://captcha.scottreule.com?redirect=${encodeURIComponent(window.location.origin + "/")}`;
-
-  // Shared link style used by all "try again" anchors
-  const retryStyle = {
-    fontFamily: "Georgia, serif", fontSize: 12,
-    color: "#5ac4e0", letterSpacing: 1,
-    textDecoration: "none",
-  };
-
-  return (
-    <div style={{
-      minHeight: "100vh", background: "#060e1a",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      gap: 20, padding: "0 24px", textAlign: "center",
-    }}>
-      {/* ── Branding ── */}
-      <img src="/coral.png" alt="" style={{ width: 56, opacity: 0.9, marginBottom: 8 }} />
-      <p style={{
-        fontFamily: "Cinzel, Georgia, serif", fontSize: 17,
-        color: "#7fcdee", letterSpacing: 3, margin: 0,
-      }}>WAVES WITHOUT WASTE</p>
-
-      {/* ── Status-dependent content ── */}
-      {status === "idle" && (
-        <>
-          <p style={{ fontFamily: "Georgia, serif", fontSize: 12, color: "#3a5a7a", letterSpacing: 1, margin: 0 }}>
-            Verify you're human to continue
-          </p>
-          <a href={captchaUrl} style={{
-            display: "inline-block", marginTop: 4,
-            padding: "12px 28px",
-            fontFamily: "Georgia, serif", fontSize: 13, letterSpacing: 1.5,
-            color: "#5ac4e0", textDecoration: "none",
-            border: "1px solid #1a4a6a", borderRadius: 4,
-            background: "rgba(90,196,224,0.06)",
-          }}>
-            Begin Verification →
-          </a>
-        </>
-      )}
-
-      {status === "checking" && (
-        <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#3a5a7a", letterSpacing: 1 }}>
-          Verifying…
-        </p>
-      )}
-
-      {status === "bot" && (
-        <>
-          <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#ff6644", letterSpacing: 0.5, margin: 0 }}>
-            You were identified as a bot.
-          </p>
-          <a href={captchaUrl} style={retryStyle}>Try again →</a>
-        </>
-      )}
-
-      {status === "pending" && (
-        <>
-          <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#ff6644", letterSpacing: 0.5, margin: 0 }}>
-            Verification incomplete — please finish the conversation.
-          </p>
-          <a href={captchaUrl} style={retryStyle}>Continue verification →</a>
-        </>
-      )}
-
-      {status === "error" && (
-        <>
-          <p style={{ fontFamily: "Georgia, serif", fontSize: 13, color: "#ff6644", letterSpacing: 0.5, margin: 0 }}>
-            Something went wrong. Please try again.
-          </p>
-          <a href={captchaUrl} style={retryStyle}>Try again →</a>
-        </>
-      )}
-    </div>
-  );
-}
-
 export default function App() {
   const [page, setPage] = useState("Home");
   const [key, setKey] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [unlocked, setUnlocked] = useState(() =>
-    sessionStorage.getItem("wwwUnlocked") === "1" ||
-    document.cookie.split(";").some(c => c.trim() === "wwwUnlocked=1")
-  );
-
-  const unlock = () => {
-    sessionStorage.setItem("wwwUnlocked", "1");
-    // Cookie is read by middleware to block direct /cleanup/* URL access
-    document.cookie = "wwwUnlocked=1; path=/; SameSite=Strict";
-    setUnlocked(true);
-  };
-
-  const lock = () => {
-    sessionStorage.removeItem("wwwUnlocked");
-    // Expire the cookie immediately so middleware blocks /cleanup/* again
-    document.cookie = "wwwUnlocked=; path=/; SameSite=Strict; max-age=0";
-    setUnlocked(false);
-  };
 
   // ❌ DANGER — navigate() is memoised with useCallback so it doesn't re-create
   //    on every render. Don't inline this into JSX props.
@@ -1713,8 +1577,6 @@ export default function App() {
     }
   };
 
-  if (!unlocked) return <CaptchaGate onUnlock={unlock} />;
-
   return (
     <>
       {/* ✅ SAFE — Injects the entire `css` string as a <style> tag in the <head>.
@@ -1729,7 +1591,7 @@ export default function App() {
       <div className={reducedMotion ? "reduced-motion" : ""} style={{ minHeight: "100vh", background: "transparent", position: "relative" }}>
 
         {/* ✅ SAFE — Navbar stays fixed at the top across all pages */}
-        <Navbar current={page} onNav={navigate} onLock={lock} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
+        <Navbar current={page} onNav={navigate} reducedMotion={reducedMotion} onToggleMotion={() => setReducedMotion(m => !m)} />
 
         {/* ✅ SAFE — key={key} forces a full re-mount on navigation, which
             re-triggers the .page-enter entrance animation on every page change */}
